@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#008542" />
+  <title>Tottus Scan & Go | Compra desde tu celular</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="manifest" href="manifest.json" />
+</head>
+<body>
+  <!-- HEADER -->
+  <header class="app-header" id="appHeader" hidden>
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-badge">T</span>
+        <div>
+          <strong>Tottus Scan & Go</strong>
+          <small id="headerUser">Hola, cliente</small>
+        </div>
+      </div>
+      <button class="icon-btn cart-btn" id="btnGoCart" aria-label="Ver carrito">
+        🛒
+        <span class="cart-badge" id="cartBadge">0</span>
+      </button>
+    </div>
+    <div class="search-bar">
+      <span>🔍</span>
+      <input type="search" id="searchInput" placeholder="Buscar productos, marcas..." autocomplete="off" />
+      <button class="chip-filter active" data-filter="all">Todo</button>
+      <button class="chip-filter" data-filter="oferta">Ofertas</button>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <!-- VISTA: LOGIN -->
+    <section id="view-login" class="view">
+      <div class="login-hero">
+        <div class="hero-bubbles"><span></span><span></span><span></span><span></span></div>
+        <div class="login-logo">T<span>ottus</span></div>
+        <div class="login-pill">✨ SCAN &amp; GO · DEMO</div>
+        <h1>Compra sin colas 🛒💨</h1>
+        <p>Escanea, paga desde tu celular y sal validado. Todo en verde.</p>
+        <div class="hero-steps">
+          <div>📷<b>Escanea</b></div>
+          <div>💳<b>Paga</b></div>
+          <div>🛡️<b>Valida y sal</b></div>
+        </div>
+        <ul class="login-benefits">
+          <li>📷 Lector de barras integrado</li>
+          <li>🛒 Carrito virtual hasta 40 productos</li>
+          <li>🧾 IGV 18% desglosado + ofertas</li>
+          <li>⏱️ QR temporal anti-capturas</li>
+        </ul>
+      </div>
+      <form id="loginForm" class="card login-card" autocomplete="on">
+        <h2>Iniciar sesión</h2>
+        <label>
+          Nombre y apellido
+          <input type="text" id="loginName" placeholder="Ej: María Quispe" required minlength="3" />
+        </label>
+        <label>
+          Correo electrónico
+          <input type="email" id="loginEmail" placeholder="tucorreo@mail.com" required />
+        </label>
+        <label>
+          Contraseña
+          <span class="pass-wrap">
+            <input type="password" id="loginPass" placeholder="••••••••" required minlength="4" />
+            <button type="button" class="pass-toggle" id="btnTogglePass" aria-label="Ver contraseña">👁️</button>
+          </span>
+        </label>
+        <label>
+          DNI (8 dígitos)
+          <input type="text" id="loginDNI" placeholder="Ej: 12345678" required inputmode="numeric" maxlength="8" pattern="\d{8}" />
+        </label>
+        <label>
+          Fecha de nacimiento
+          <input type="date" id="loginBirth" required />
+        </label>
+        <p class="muted small">🔞 RN02: licores solo +18 años. Se valida con tu fecha de nacimiento.</p>
+        <button type="submit" class="btn-primary">Ingresar a la tienda →</button>
+        <div class="demo-divider"><span>o demo rápida</span></div>
+        <button type="button" class="btn-demo" id="btnDemo">⚡ Entrar sin registro (Demo)</button>
+        <p class="muted small">Demo académica: botón verde para entrar al instante. Datos solo en tu celular.</p>
+      </form>
+    </section>
+
+    <!-- VISTA: HOME / CATALOGO -->
+    <section id="view-home" class="view" hidden>
+      <div class="promo-banner">
+        <div class="promo-ticker">🔥 OFERTAS TOTTUS · HASTA 40% DSCTO · 🔥 OFERTAS TOTTUS · HASTA 40% DSCTO ·</div>
+        <div class="promo-main">
+          <div>
+            <strong>🌿 Semana Verde de ofertas</strong>
+            <p>Precios ya incluyen IGV · Solo en la app</p>
+          </div>
+          <button class="btn-small" id="btnVerOfertas">Ver ofertas</button>
+        </div>
+      </div>
+
+      <div class="steps-mini">
+        <div class="step-mini done">1 📷 Escanea</div>
+        <div class="step-mini">2 🛒 Carrito</div>
+        <div class="step-mini">3 💳 Paga</div>
+        <div class="step-mini">4 🛡️ Sal</div>
+      </div>
+
+      <div class="scan-cta card">
+        <div>
+          <strong>¿Estás en tienda? ⚡</strong>
+          <p class="muted">Escanea el código de barras y súmalo al carrito al instante.</p>
+        </div>
+        <button class="btn-scan pulse-ring" id="btnOpenScanner">📷<span>Escanear</span></button>
+      </div>
+
+      <h2 class="section-title">Catálogo <span id="productCount"></span></h2>
+      <div id="productGrid" class="product-grid"></div>
+    </section>
+
+    <!-- VISTA: SCANNER -->
+    <section id="view-scanner" class="view" hidden>
+      <div class="card scanner-card">
+        <h2>📷 Lector de código de barras</h2>
+        <p class="muted">Apunta al código EAN-13 del producto o ingrésalo manualmente.</p>
+        <div class="scanner-viewport">
+          <video id="scannerVideo" playsinline muted></video>
+          <div class="scan-frame"></div>
+          <p id="scannerStatus" class="scanner-status">Cámara detenida</p>
+        </div>
+        <div class="scanner-actions">
+          <button class="btn-primary" id="btnStartCamera">Activar cámara</button>
+          <button class="btn-ghost" id="btnStopCamera">Detener</button>
+        </div>
+        <div class="manual-scan">
+          <label>Código manual / simulado
+            <div class="manual-row">
+              <input type="text" id="manualCode" inputmode="numeric" placeholder="Ej: 7750123450013" />
+              <button class="btn-dark" id="btnManualAdd">Agregar</button>
+            </div>
+          </label>
+          <details class="codes-help">
+            <summary>Ver códigos de prueba</summary>
+            <div id="codesList" class="codes-list"></div>
+          </details>
+          <p id="scanResult" class="scan-result"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- VISTA: CARRITO -->
+    <section id="view-cart" class="view" hidden>
+      <h2 class="section-title">🛒 Mi carrito <span id="cartCountLabel"></span></h2>
+      <p class="muted small">Máximo permitido: <strong>40 productos</strong> por compra rápida 🧺. Más de 40 pasa por caja tradicional.</p>
+      <div class="progress-wrap">
+        <div class="progress-bar"><div id="cartProgress"></div></div>
+        <small id="cartProgressLabel">0 / 40</small>
+      </div>
+      <div id="cartList" class="cart-list"></div>
+
+      <div class="card totals-card">
+        <h3>Resumen de compra</h3>
+        <div class="totals-row"><span>Subtotal (sin IGV)</span><span id="subtotalEl">S/ 0.00</span></div>
+        <div class="totals-row"><span>IGV (18%)</span><span id="igvEl">S/ 0.00</span></div>
+        <div class="totals-row discount"><span>Ahorro por ofertas</span><span id="savingEl">− S/ 0.00</span></div>
+        <div class="totals-row total"><span>Total a pagar</span><span id="totalEl">S/ 0.00</span></div>
+        <p class="muted small">En Perú los precios en góndola ya incluyen IGV. Aquí se muestra el desglose: Subtotal = Total / 1.18.</p>
+        <button class="btn-primary" id="btnCheckout">Finalizar compra →</button>
+        <button class="btn-ghost danger" id="btnClearCart">Vaciar carrito</button>
+      </div>
+
+      <div id="ticketCard" class="card ticket" hidden>
+        <h3>🧾 Boleta / Ticket Scan & Go</h3>
+        <div id="ticketBody"></div>
+        <button class="btn-primary" id="btnGoToPay">Pagar desde el celular →</button>
+        <button class="btn-ghost" id="btnPrintTicket">🖨️ Imprimir / PDF</button>
+        <button class="btn-ghost" id="btnCloseTicket">Seguir comprando</button>
+      </div>
+      <div class="card" id="historyCard">
+        <h3>📜 Historial de compras</h3>
+        <div id="historyList" class="hist-list"></div>
+        <button class="btn-ghost" id="btnClearHistory">Borrar historial</button>
+      </div>
+    </section>
+
+    <!-- VISTA: PAGO + QR + VALIDACIONES -->
+    <section id="view-checkout" class="view" hidden>
+      <h2 class="section-title">💳 Pago y retiro</h2>
+      <div class="checkout-progress">
+        <div class="cp-step" id="cp1">1💳<span>Pago</span></div>
+        <div class="cp-line"></div>
+        <div class="cp-step" id="cp2">2🏪<span>Caja</span></div>
+        <div class="cp-line"></div>
+        <div class="cp-step" id="cp3">3🛡️<span>Salida</span></div>
+        <div class="cp-line"></div>
+        <div class="cp-step" id="cp4">4✅<span>Listo</span></div>
+      </div>
+
+      <!-- Paso 1: pagar -->
+      <div class="card" id="payStep1">
+        <h3>1️⃣ Paga desde tu celular</h3>
+        <p class="muted small">Total a pagar: <strong id="payTotalLabel">S/ 0.00</strong> <span id="payItemsLabel"></span></p>
+        <p class="muted small perf-hint" id="payTimerHint"></p>
+        <div class="pay-methods">
+          <label class="pay-opt"><input type="radio" name="payMethod" value="Yape" checked /> 💜 Yape</label>
+          <label class="pay-opt"><input type="radio" name="payMethod" value="Plin" /> 🩵 Plin</label>
+          <label class="pay-opt"><input type="radio" name="payMethod" value="Tarjeta" /> 💳 Tarjeta</label>
+        </div>
+        <div class="card-form" id="cardForm" hidden>
+          <label>Número (demo 16 dígitos)
+            <input type="text" id="cardNumber" inputmode="numeric" maxlength="19" placeholder="4111 1111 1111 1111" />
+          </label>
+          <div class="row2">
+            <label>Vence MM/AA
+              <input type="text" id="cardExp" maxlength="5" placeholder="12/28" />
+            </label>
+            <label>CVV
+              <input type="password" id="cardCvv" inputmode="numeric" maxlength="3" placeholder="123" />
+            </label>
+          </div>
+          <p class="muted small">Demo académica: no se cobra real, solo se valida formato.</p>
+        </div>
+        <button class="btn-primary" id="btnPayNow">Pagar ahora</button>
+        <p class="muted small">Pago simulado (demo). En producción aquí se conecta a la pasarela real.</p>
+      </div>
+
+      <!-- Paso 2: QR caja -->
+      <div class="card qr-card qr-caja" id="payStep2" hidden>
+        <div class="qr-flag">🏪 INTERFAZ CAJA</div>
+        <h3>2️⃣ Confirma en Caja</h3>
+        <p class="muted small">Acércate a caja y muestra este QR. Caduca en <strong id="qrCajaTimer">05:00</strong> para evitar capturas reutilizadas.</p>
+        <p class="qr-secure-note">🔒 <b>Tu seguridad:</b> este QR es <b>de un solo uso</b>, caduca en 5 minutos y se anula si regeneras uno nuevo. No lo compartas ni permitas que le tomen captura: Tottus lo invalida automáticamente.</p>
+        <div class="qr-box">
+          <canvas id="qrCajaCanvas"></canvas>
+          <div class="qr-code-text">Código caja: <strong id="qrCajaCode">------</strong></div>
+          <div class="qr-status" id="qrCajaStatus">QR vigente</div>
+        </div>
+        <div class="row2">
+          <button class="btn-dark" id="btnRegenCaja">↻ Regenerar QR</button>
+          <button class="btn-primary" id="btnValidateCaja">✅ Validar en Caja (demo)</button>
+        </div>
+        <details class="codes-help">
+          <summary>¿Eres cajero? Validación manual</summary>
+          <div class="manual-row">
+            <input id="cajaInput" inputmode="numeric" placeholder="Código de 6 dígitos" maxlength="6" />
+            <button class="btn-dark" id="btnCajaManual">Confirmar</button>
+          </div>
+        </details>
+      </div>
+
+      <!-- Paso 3: QR seguridad -->
+      <div class="card qr-card qr-seg" id="payStep3" hidden>
+        <div class="qr-flag">🛡️ INTERFAZ SEGURIDAD</div>
+        <h3>3️⃣ Confirma tu salida con Seguridad</h3>
+        <p class="muted small">Tras validar en caja se genera tu pase de salida. Caduca en <strong id="qrSalidaTimer">03:00</strong>.</p>
+        <p class="qr-secure-note">🔒 Este pase es <b>distinto</b> al QR de caja, caduca en 3 minutos y solo sirve una vez. Muéstralo únicamente al personal de seguridad Tottus.</p>
+        <div class="qr-box">
+          <canvas id="qrSalidaCanvas"></canvas>
+          <div class="qr-code-text">Código salida: <strong id="qrSalidaCode">------</strong></div>
+          <div class="qr-status" id="qrSalidaStatus">Pase vigente</div>
+        </div>
+        <div class="row2">
+          <button class="btn-dark" id="btnRegenSalida">↻ Regenerar pase</button>
+          <button class="btn-primary" id="btnValidateSalida">🛡️ Validar salida (demo)</button>
+        </div>
+        <details class="codes-help">
+          <summary>¿Eres seguridad? Validación manual</summary>
+          <div class="manual-row">
+            <input id="segInput" inputmode="numeric" placeholder="Código de 6 dígitos" maxlength="6" />
+            <button class="btn-dark" id="btnSegManual">Autorizar salida</button>
+          </div>
+        </details>
+      </div>
+
+      <!-- Paso 4: final -->
+      <div class="card ticket" id="payStep4" hidden>
+        <h3>🎊 ¡Felicidades por tu compra!</h3>
+        <div id="finalTicketBody"></div>
+        <button class="btn-ghost" id="btnPrintFinal">🖨️ Imprimir / PDF</button>
+        <button class="btn-primary" id="btnNewPurchase">Iniciar nueva compra</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- BOTTOM NAV (mobile) -->
+  <nav class="bottom-nav" id="bottomNav" hidden>
+    <button data-nav="home" class="active">🏠<span>Tienda</span></button>
+    <button data-nav="scanner" class="nav-scan">📷<span>Escanear</span></button>
+    <button data-nav="cart">🛒<span>Carrito</span></button>
+    <button data-nav="checkout">💳<span>Pagar</span></button>
+    <button data-nav="logout">👤<span>Salir</span></button>
+  </nav>
+
+  <div id="toast" class="toast"></div>
+
+  <!-- RN-CAJA-RÁPIDA: modal bloqueante de tope 40 -->
+  <div id="fastLimitModal" class="modal-overlay" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fastLimitTitle">
+      <h3 id="fastLimitTitle">⚠️ Compra rápida</h3>
+      <p>Límite de compras rápidas alcanzado (40 artículos). Dirígete a una caja tradicional para procesar esta compra.</p>
+      <button class="btn-primary" id="btnCloseFastModal">Entendido</button>
+    </div>
+  </div>
+
+  <!-- TOBI: robot guía de Tottus -->
+  <div class="bot-widget" id="botWidget">
+    <div class="bot-bubble" id="botBubble" hidden>
+      <p id="botText"></p>
+      <button class="bot-close" id="botClose" aria-label="Cerrar mensaje">✕</button>
+    </div>
+    <button class="bot-avatar" id="botAvatar" aria-label="Tobi, tu asistente Tottus">
+      <span class="bot-antenna"></span>
+      <span class="bot-head">
+        <span class="bot-eye bot-eye-l"></span>
+        <span class="bot-eye bot-eye-r"></span>
+        <span class="bot-smile"></span>
+      </span>
+      <span class="bot-body"><i>T</i></span>
+      <span class="bot-name">TOBI</span>
+    </button>
+  </div>
+
+  <!-- Confeti de celebración -->
+  <canvas id="confettiCanvas"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
