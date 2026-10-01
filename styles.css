@@ -357,7 +357,7 @@ body {
 @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
 @keyframes wave { 0%,100% { transform: rotate(0); } 50% { transform: rotate(14deg); } }
 @keyframes bubbleIn { from { opacity: 0; transform: translateY(10px) scale(.9); } to { opacity: 1; transform: none; } }
-.bot-widget { position: fixed; right: 12px; bottom: 96px; z-index: 40; display: grid; justify-items: end; gap: 6px; }
+.bot-widget { position: fixed; right: 30px !important; bottom: 120px !important; z-index: 40; display: grid; justify-items: end; gap: 6px; }
 .bot-avatar {
   position: relative; width: 74px; height: 96px; border: none; background: none;
   cursor: pointer; display: grid; justify-items: center; filter: drop-shadow(0 8px 14px rgba(4,77,41,.35));
@@ -397,13 +397,14 @@ body {
   background: var(--green-deep); border-radius: 999px; padding: 2px 8px; margin-top: 3px;
 }
 .bot-bubble {
-  position: relative; max-width: 240px; width: max-content;
+  position: relative; max-width: min(260px, calc(100vw - 70px)); width: max-content;
+  margin-right: 10px;
   background: #fff; border: 2px solid var(--green); border-radius: 16px 16px 4px 16px;
   padding: 10px 30px 10px 12px; font-size: 13px; line-height: 1.45;
   box-shadow: var(--shadow); animation: bubbleIn .3s ease;
 }
 .bot-bubble::after {
-  content: ""; position: absolute; right: 14px; bottom: -9px;
+  content: ""; position: absolute; right: 25px; bottom: -9px;
   border: 5px solid transparent; border-top-color: var(--green); border-right-color: var(--green);
 }
 .bot-bubble p { margin: 0; }
@@ -468,7 +469,7 @@ body {
   body { padding-bottom: 20px; }
   .bottom-nav { position: sticky; max-width: 640px; margin: 14px auto 0; }
   .toast { bottom: 30px; }
-  .bot-widget { bottom: 24px; right: max(12px, calc(50% - 330px)); }
+  .bot-widget { bottom: 120px !important; right: max(30px, calc(50% - 310px)) !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }

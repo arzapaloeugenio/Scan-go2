@@ -90,6 +90,7 @@
 
 ### 4.4b TOBI 🤖 robot guía (`botSay`, `botGuideView`, `firstName`)
 - Widget flotante abajo-derecha: avatar robot CSS (antena pulsante, ojos que parpadean, cuerpo con “T” Tottus) + burbuja con efecto de escritura.
+- **Posición (solo CSS, sin JS):** `.bot-widget` en `bottom:120px !important; right:30px !important` para quedar sobre la barra inferior; en `@media (min-width:700px)` pasa a `bottom:120px !important; right:max(30px, calc(50% - 310px)) !important` para no recortarse en escritorio. `.bot-bubble` con `margin-right:10px` y tope `min(260px, calc(100vw - 70px))`; cola `.bot-bubble::after` en `right:25px` para apuntar al centro de la cabeza.
 - Saluda al cliente **con su nombre registrado** tras login/demo, y da guía contextual por vista (scanner, carrito, checkout) y por eventos (primer producto, tope del carrito, QR de caja, pase de salida, compra autorizada).
 - Clic en el robot reabre el último mensaje; la ✕ lo cierra. Mensajes clave incluyen la explicación de seguridad del QR.
 
@@ -160,6 +161,7 @@ tottus_history = [{ ticketId, date, total, qty, method }] (máx. 20)
 - Productos con hover lift; `add-btn` degradado verde.
 - QR Caja (borde verde) vs QR Seguridad (degradado + flag) claramente diferenciados.
 - Nav inferior flotante redondeado; activo en degradado verde elevado.
+- TOBI posicionado sobre la barra inferior (`bottom:120px`, `right:30px`; escritorio `max(30px, calc(50% - 310px))`), burbuja con `margin-right:10px` y cola en `right:25px` sin desborde móvil.
 - Modal `#fastLimitModal` bloqueante responsive (overlay + card max 420px, `z-index:70`).
 - Respeta `prefers-reduced-motion`.
 
