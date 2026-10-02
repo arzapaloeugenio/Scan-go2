@@ -10,20 +10,20 @@ const QR_SALIDA_TTL_SEC = 3 * 60;
 const QR_SECRET = "tottus-scan-go-demo";
 
 const PRODUCTS = [
-  { id: 1,  name: "Leche Gloria Entera 1L", brand: "Gloria", price: 5.20, oldPrice: 5.90, code: "7750123450013", emoji: "🥛", cat: "lacteos" },
-  { id: 2,  name: "Pan de Molde Blanco 650g", brand: "Bimbo", price: 7.50, oldPrice: null, code: "7750123450020", emoji: "🍞", cat: "panaderia" },
-  { id: 3,  name: "Arroz Superior 5kg", brand: "Costeño", price: 22.90, oldPrice: 26.90, code: "7750123450037", emoji: "🍚", cat: "abarrotes" },
-  { id: 4,  name: "Aceite Vegetal 1L", brand: "Primor", price: 9.80, oldPrice: null, code: "7750123450044", emoji: "🫗", cat: "abarrotes" },
-  { id: 5,  name: "Pollo Entero x kg", brand: "Tottus", price: 12.90, oldPrice: 14.50, code: "7750123450051", emoji: "🍗", cat: "carnes" },
-  { id: 6,  name: "Gaseosa Inca Kola 2L", brand: "Inca Kola", price: 8.50, oldPrice: 9.50, code: "7750123450068", emoji: "🥤", cat: "bebidas" },
-  { id: 7,  name: "Fideos Spaghetti 500g", brand: "Don Vittorio", price: 3.80, oldPrice: null, code: "7750123450075", emoji: "🍝", cat: "abarrotes" },
-  { id: 8,  name: "Detergente 2kg", brand: "Ariel", price: 24.90, oldPrice: 32.90, code: "7750123450082", emoji: "🧺", cat: "limpieza" },
-  { id: 9,  name: "Manzana Gala x kg", brand: "Tottus Fresco", price: 6.90, oldPrice: null, code: "7750123450099", emoji: "🍎", cat: "frutas" },
-  { id: 10, name: "Chocolate Sublime 40g", brand: "Nestlé", price: 2.50, oldPrice: 3.00, code: "7750123450105", emoji: "🍫", cat: "golosinas" },
-  { id: 11, name: "Café Instantáneo 200g", brand: "Nescafé", price: 19.90, oldPrice: 23.90, code: "7750123450112", emoji: "☕", cat: "abarrotes" },
-  { id: 12, name: "Papel Higiénico 24 rollos", brand: "Suave", price: 27.50, oldPrice: null, code: "7750123450129", emoji: "🧻", cat: "limpieza" },
-  { id: 13, name: "Cerveza Cristal Six Pack 355ml", brand: "Cristal", price: 24.90, oldPrice: 29.90, code: "7750123450136", emoji: "🍺", cat: "licores", restricted: true },
-  { id: 14, name: "Vino Tinto Borgoña 750ml", brand: "Tabernero", price: 32.50, oldPrice: null, code: "7750123450143", emoji: "🍷", cat: "licores", restricted: true },
+  { id: 1,  name: "Leche Gloria Entera 1L", brand: "Gloria", price: 5.20, oldPrice: 5.90, code: "7750123450013", image: "img/LecheGloriaEntera1L.png", cat: "lacteos" },
+  { id: 2,  name: "Pan de Molde Blanco 650g", brand: "Bimbo", price: 7.50, oldPrice: null, code: "7750123450020", image: "img/Bimbo.png", cat: "panaderia" },
+  { id: 3,  name: "Arroz Superior 5kg", brand: "Costeño", price: 22.90, oldPrice: 26.90, code: "7750123450037", image: "img/Costeño.png", cat: "abarrotes" },
+  { id: 4,  name: "Aceite Vegetal 1L", brand: "Primor", price: 9.80, oldPrice: null, code: "7750123450044", image: "img/Primor.png", cat: "abarrotes" },
+  { id: 5,  name: "Pollo Entero x kg", brand: "Tottus", price: 12.90, oldPrice: 14.50, code: "7750123450051", image: "img/PolloTottus.png", cat: "carnes" },
+  { id: 6,  name: "Gaseosa Inca Kola 2L", brand: "Inca Kola", price: 8.50, oldPrice: 9.50, code: "7750123450068", image: "img/IncaKola.png", cat: "bebidas" },
+  { id: 7,  name: "Fideos Spaghetti 500g", brand: "Don Vittorio", price: 3.80, oldPrice: null, code: "7750123450075", image: "img/don-vittorio-spaguetti-x-500-gr.png", cat: "abarrotes" },
+  { id: 8,  name: "Detergente 2kg", brand: "Ariel", price: 24.90, oldPrice: 32.90, code: "7750123450082", image: "img/Ariel.png", cat: "limpieza" },
+  { id: 9,  name: "Manzana Gala x kg", brand: "Tottus Fresco", price: 6.90, oldPrice: null, code: "7750123450099", image: "img/TottusFresco.png", cat: "frutas" },
+  { id: 10, name: "Chocolate Sublime 40g", brand: "Nestlé", price: 2.50, oldPrice: 3.00, code: "7750123450105", image: "img/NestléSublime.png", cat: "golosinas" },
+  { id: 11, name: "Café Instantáneo 200g", brand: "Nescafé", price: 19.90, oldPrice: 23.90, code: "7750123450112", image: "img/Nescafé.png", cat: "abarrotes" },
+  { id: 12, name: "Papel Higiénico 24 rollos", brand: "Suave", price: 27.50, oldPrice: null, code: "7750123450129", image: "img/Suave.png", cat: "limpieza" },
+  { id: 13, name: "Cerveza Cristal Six Pack 355ml", brand: "Cristal", price: 24.90, oldPrice: 29.90, code: "7750123450136", image: "img/CRISTAL-SIX-PACK-LATA.png", cat: "licores", restricted: true },
+  { id: 14, name: "Vino Tinto Borgoña 750ml", brand: "Tabernero", price: 32.50, oldPrice: null, code: "7750123450143", image: "img/Tabernero.png", cat: "licores", restricted: true },
 ];
 
 PRODUCTS.forEach(p => {
@@ -217,7 +217,7 @@ function renderProducts() {
   $("productCount").textContent = `(${list.length})`;
   grid.innerHTML = list.map(p => `
     <article class="product">
-      <div class="product-img">${p.emoji}
+      <div class="product-img"><img src="${p.image}" class="product-image" alt="${p.name}">
         ${p.discount ? `<span class="discount-tag">-${p.discount}%</span>` : ""}
         ${p.restricted ? `<span class="restricted-tag">+18</span>` : ""}
       </div>
@@ -260,7 +260,7 @@ function renderCart() {
       const p = PRODUCTS.find(x => x.code === code);
       if (!p) return "";
       return `<div class="cart-item">
-        <div class="emoji">${p.emoji}</div>
+        <img src="${p.image}" class="product-image" alt="${p.name}">
         <div class="cart-info">
           <strong>${p.name}</strong>
           <small>${money(p.price)} c/u · EAN ${p.code}</small><br>
