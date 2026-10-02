@@ -36,8 +36,7 @@ const money = (n) => "S/ " + n.toFixed(2);
 let cart = {}; // code -> qty
 let currentFilter = "all";
 let searchTerm = "";
-let stream = null;
-let scanning = false;
+let scannerRunning = false;
 // Estado del pago/retiro
 let order = null; // { ticketId, method, total, items, subtotal, igv, saving, qty, caja:{code,token,exp,used}, salida:{...}, status }
 let qrTimer = null;
@@ -325,54 +324,59 @@ function updateAuthUI() {
   }
 }
 
-// ---------- SCANNER ----------
+// ---------- SCANNER (html5-qrcode universal) ----------
+function onScanFailure(error) {
+  // Se ignoran los errores de lectura por frame para no saturar la UI
+}
+
 async function startCamera() {
-  const video = $("scannerVideo");
+  if (scannerRunning) return;
+  const statusEl = $("scannerStatus");
   try {
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error("Sin cámara");
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-    video.srcObject = stream;
-    await video.play();
-    scanning = true;
-    $("scannerStatus").textContent = "📷 Apunta al código de barras...";
-    loopDetect(video);
+    if (typeof Html5QrcodeScanner === "undefined") {
+      if (statusEl) statusEl.textContent = "⚠️ Librería de escaneo no cargada. Usa ingreso manual.";
+      toast("⚠️ Cámara no disponible, usa código manual");
+      return;
+    }
+    const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+    window._html5QrcodeScanner = html5QrcodeScanner;
+    scannerRunning = true;
+    scanT0 = performance.now();
+    if (statusEl) statusEl.textContent = "📷 Apunta al código de barras...";
+    function onScanSuccess(decodedText, decodedResult) {
+      html5QrcodeScanner.clear().then(() => {
+        scannerRunning = false;
+        window._html5QrcodeScanner = null;
+        if (statusEl) statusEl.textContent = "✅ Código leído";
+        onScannedCode(decodedText);
+      }).catch(() => {
+        scannerRunning = false;
+        onScannedCode(decodedText);
+      });
+    }
+    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
   } catch (e) {
-    $("scannerStatus").textContent = "⚠️ No se pudo abrir la cámara. Usa ingreso manual.";
+    scannerRunning = false;
+    if (statusEl) statusEl.textContent = "⚠️ No se pudo abrir la cámara. Usa ingreso manual.";
     toast("⚠️ Cámara no disponible, usa código manual");
   }
 }
 
-function stopCamera() {
-  scanning = false;
-  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  const v = $("scannerVideo");
-  if (v) { v.pause(); v.srcObject = null; }
+async function stopCamera() {
+  try {
+    const active = window._html5QrcodeScanner;
+    if (active) {
+      await active.clear();
+      window._html5QrcodeScanner = null;
+    }
+  } catch { /* noop */ }
+  scannerRunning = false;
+  try {
+    const readerEl = $("reader");
+    if (readerEl) readerEl.innerHTML = "";
+  } catch { /* noop */ }
   const st = $("scannerStatus");
   if (st && $("view-scanner").hidden === false) st.textContent = "Cámara detenida";
-}
-
-async function loopDetect(video) {
-  if (!("BarcodeDetector" in window)) {
-    $("scannerStatus").textContent = "Este navegador no soporta detección automática. Usa ingreso manual.";
-    return;
-  }
-  const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "code_128", "qr_code"] });
-  let lastCode = "";
-  while (scanning && stream) {
-    try {
-      scanT0 = performance.now();
-      const codes = await detector.detect(video);
-      if (codes.length) {
-        const value = codes[0].rawValue.trim();
-        if (value !== lastCode) {
-          lastCode = value;
-          onScannedCode(value);
-          await new Promise(r => setTimeout(r, 1500));
-        }
-      }
-    } catch { /* ignorar frame */ }
-    await new Promise(r => setTimeout(r, 400));
-  }
 }
 
 function onScannedCode(code) {

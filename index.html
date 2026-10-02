@@ -122,9 +122,8 @@
       <div class="card scanner-card">
         <h2>📷 Lector de código de barras</h2>
         <p class="muted">Apunta al código EAN-13 del producto o ingrésalo manualmente.</p>
+        <div id="reader" style="width: 100%; max-width: 400px; margin: auto;"></div>
         <div class="scanner-viewport">
-          <video id="scannerVideo" playsinline muted></video>
-          <div class="scan-frame"></div>
           <p id="scannerStatus" class="scanner-status">Cámara detenida</p>
         </div>
         <div class="scanner-actions">
@@ -323,6 +322,7 @@
   <canvas id="confettiCanvas"></canvas>
 
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <script src="app.js"></script>
 </body>
 </html>
