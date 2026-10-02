@@ -420,7 +420,8 @@ function botSay(html, keepMs = 11000) {
   botLastMsg = html;
   clearTimeout(botHideTimer);
   clearInterval(botTypeTimer);
-  b.hidden = false;
+  // Estado base colapsado: actualiza el texto en segundo plano sin expandir el robot.
+  // Solo el click del usuario (botWidget/botAvatar) controla la clase active.
   av.classList.remove("talking");
   void av.offsetWidth;
   av.classList.add("talking");
@@ -438,12 +439,14 @@ function botSay(html, keepMs = 11000) {
       t.innerHTML = html;
     }
   }, 16);
-  botHideTimer = setTimeout(() => { b.hidden = true; }, keepMs);
+  // Sin auto-expand ni auto-colapso: el texto queda listo en segundo plano.
 }
 
 function botClose() {
   const b = $("botBubble");
-  if (b) b.hidden = true;
+  const w = $("botWidget");
+  if (b) { b.classList.remove('active'); b.hidden = true; }
+  if (w) w.classList.remove('active');
   clearTimeout(botHideTimer);
   clearInterval(botTypeTimer);
 }
@@ -809,13 +812,26 @@ function init() {
     $("btnTogglePass").textContent = i.type === "password" ? "👁️" : "🙈";
   });
 
-  // TOBI: tocar el robot reabre el último mensaje; la ✕ lo cierra
-  $("botAvatar").addEventListener("click", () => {
+  // TOBI: apertura/cierre solo desde el cuerpo con la "T"
+  document.querySelector('.bot-body').addEventListener('click', (event) => {
+    event.stopPropagation();
+    $("botWidget").classList.toggle('active');
     const b = $("botBubble");
-    if (b.hidden && botLastMsg) botSay(botLastMsg);
-    else b.hidden = !b.hidden;
+    if (b) {
+      const isOpen = $("botWidget").classList.contains('active');
+      b.hidden = !isOpen;
+      b.classList.toggle('active', isOpen);
+      if (isOpen && botLastMsg && !$("botText").textContent) botSay(botLastMsg);
+    }
   });
-  $("botClose").addEventListener("click", botClose);
+  $("botBubble").addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+  $("botClose").addEventListener("click", (event) => {
+    event.stopPropagation();
+    $("botWidget").classList.remove('active');
+    botClose();
+  });
   botSay(`👋 <b>¡Hola! Soy Tobi</b> 🤖🌿, el robot guía de Tottus. Inicia sesión o entra con la demo y yo te enseño a comprar sin hacer colas 🛒💨`);
 
   document.querySelectorAll(".bottom-nav button").forEach(b => {

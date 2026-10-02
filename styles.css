@@ -387,7 +387,7 @@ body {
 @keyframes bubbleIn { from { opacity: 0; transform: translateY(10px) scale(.9); } to { opacity: 1; transform: none; } }
 .bot-widget { position: fixed; right: 30px !important; bottom: 120px !important; z-index: 40; display: grid; justify-items: end; gap: 6px; }
 .bot-avatar {
-  position: relative; width: 74px; height: 96px; border: none; background: none;
+  position: relative; width: 59px; height: 77px; border: none; background: none;
   cursor: pointer; display: grid; justify-items: center; filter: drop-shadow(0 8px 14px rgba(4,77,41,.35));
   transition: transform .15s;
 }
@@ -395,6 +395,7 @@ body {
 .bot-avatar.talking { animation: wave .5s ease 2; }
 .bot-antenna {
   width: 4px; height: 12px; background: var(--green-deep); border-radius: 4px; position: relative;
+  opacity: 0; pointer-events: none; transform: scale(0); transition: all 0.3s ease;
 }
 .bot-antenna::after {
   content: ""; position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
@@ -405,6 +406,7 @@ body {
   width: 62px; height: 46px; background: linear-gradient(180deg, #fff, var(--green-soft));
   border: 3px solid var(--green-deep); border-radius: 18px;
   display: flex; align-items: center; justify-content: center; gap: 8px; position: relative;
+  opacity: 0; pointer-events: none; transform: scale(0); transition: all 0.3s ease;
 }
 .bot-eye { width: 10px; height: 13px; background: var(--green-deep); border-radius: 50%; animation: blink 4s infinite; }
 .bot-eye-r { animation-delay: .05s; }
@@ -418,18 +420,31 @@ body {
   background: linear-gradient(135deg, var(--green), var(--green-deep));
   border: 3px solid var(--green-deep); border-radius: 12px;
   display: grid; place-items: center;
+  opacity: 1; pointer-events: auto; transform: scale(1);
+  cursor: pointer;
 }
 .bot-body i { font-style: normal; color: #fff; font-weight: 900; font-size: 18px; }
 .bot-name {
   font-size: 9px; font-weight: 900; letter-spacing: 1.5px; color: #fff;
   background: var(--green-deep); border-radius: 999px; padding: 2px 8px; margin-top: 3px;
+  opacity: 0; pointer-events: none; transform: scale(0); transition: all 0.3s ease;
 }
 .bot-bubble {
   position: relative; max-width: min(260px, calc(100vw - 70px)); width: max-content;
   margin-right: 10px;
   background: #fff; border: 2px solid var(--green); border-radius: 16px 16px 4px 16px;
-  padding: 10px 30px 10px 12px; font-size: 13px; line-height: 1.45;
+  padding: 10px 30px 10px 12px; font-size: 14px; line-height: 1.45;
   box-shadow: var(--shadow); animation: bubbleIn .3s ease;
+  opacity: 0; pointer-events: none; transform: scale(0); transition: all 0.3s ease;
+}
+.bot-bubble.active {
+  opacity: 1; pointer-events: auto; transform: scale(1);
+}
+.bot-widget.active .bot-head,
+.bot-widget.active .bot-antenna,
+.bot-widget.active .bot-name,
+.bot-widget.active .bot-bubble {
+  opacity: 1; pointer-events: auto; transform: scale(1);
 }
 .bot-bubble::after {
   content: ""; position: absolute; right: 25px; bottom: -9px;
