@@ -2,6 +2,7 @@
 
 > Documento de trabajo: segunda iteración del proyecto **Tottus Scan & Go** (Universidad Norbert Wiener – Software 1, Proyecto Integrador).
 > Fecha: septiembre 2026 · Equipo: Arzapalo, Alva, Cabrejos, Condori · Ciclo: IS4M1.
+> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). Todo el código se genera solo con **Opencode**.
 
 Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 
@@ -12,6 +13,8 @@ Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 | `app.js` | Toda la lógica: auth, carrito, escáner, IGV, pago, QRs, TOBI y confeti |
 | `DOCUMENTACION-TECNICA.md` | Documentación técnica completa actualizada |
 | `MEJORAS-IMPLEMENTADAS.md` | **Este documento:** registro de las mejoras de esta iteración |
+| `img/` | Logotipo (`Logo_Tottus.png`) + 14 fotos reales de productos |
+| `manifest.json` + `sw.js` | PWA mínima (manifest instalable + SW cache-first) |
 
 ---
 
@@ -22,7 +25,7 @@ Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 | 1 | Robot guía con temática Tottus que saluda por nombre | ✅ | `botSay()`, widget `#botWidget` |
 | 2 | TOBI guía el escaneo de productos paso a paso | ✅ | `botGuideView("scanner")` |
 | 3 | TOBI explica cómo pagar desde el celular | ✅ | `botGuideView("checkout")` + `payNow()` |
-| 4 | Carrito con máximo de productos justificado | ✅ | `MAX_ITEMS = 150` |
+| 4 | Carrito con máximo de productos justificado | ✅ | `MAX_ITEMS = 150` (2.ª iteración; vigente `40`, ver §10) |
 | 5 | QR seguro para validación en Caja | ✅ | `issueCajaQR()`, 5:00 min |
 | 6 | QR seguro para validación en Seguridad (salida) | ✅ | `issueSalidaQR()`, 3:00 min |
 | 7 | Confetis + "¡Felicidades por tu compra!" al finalizar | ✅ | `confettiBurst()` |
@@ -61,8 +64,8 @@ TOBI es una mascota asistente exclusiva de la app, con los colores institucional
 | Acceso demo | "Estás en el modo de prueba de Tottus Scan & Go..." |
 | Vista Escáner | Explica la cámara, el marco verde y el ingreso manual |
 | Primer producto agregado | Felicita y explica que total/IGV se actualizan |
-| Vista Carrito | Explica controles −/+ y el límite de 150 productos |
-| Carrito llega a 150 | Avisa del tope y redirige a pagar |
+| Vista Carrito | Explica controles −/+ y el límite de 40 productos (compra rápida) |
+| Carrito llega a 40 | Abre el modal de tope y redirige a pagar o a caja tradicional |
 | Vista Pago | Explica los métodos (Yape/Plin/Tarjeta) |
 | QR de Caja emitido | **Explica la seguridad**: un solo uso, 5 min, regeneración anula |
 | Pase de Salida emitido | Último paso: mostrar a seguridad, caduca en 3 min |
@@ -97,7 +100,9 @@ firstName()            // extrae el primer nombre del usuario registrado
 
 ---
 
-## 4. 🛒 Límite del carrito: 150 productos
+## 4. 🛒 Límite del carrito: 40 productos (compra rápida — vigente)
+
+> Valor original de 2.ª iteración: `150`. Evolucionó a `205` (Fase 1, objetivo del informe) y finalmente a **`40`** por la regla de negocio RN-CAJA-RÁPIDA (ver §10). La justificación de fraude de la tabla siguiente sigue vigente.
 
 ### Justificación
 | Consideración | Análisis |
@@ -107,7 +112,8 @@ firstName()            // extrae el primer nombre del usuario registrado
 | Apps Scan & Go reales (Walmart, Sam's Club) | topes de 100–200 unidades |
 | Riesgo de fraude | a más ítems por ticket QR, mayor exposición si el QR se intercepta |
 
-**Decisión: `MAX_ITEMS = 150`** — cubre >99% de las compras reales (incluso las mensuales) y minimiza la ventana de riesgo. El tope se muestra en la UI con barra de progreso (`qty / 150`) y bloqueo con toast + aviso de TOBI al alcanzarlo.
+**Decisión (2.ª iteración): `MAX_ITEMS = 150`** — cubre >99% de las compras reales (incluso las mensuales) y minimiza la ventana de riesgo. El tope se muestra en la UI con barra de progreso (`qty / 150`) y bloqueo con toast + aviso de TOBI al alcanzarlo.
+**Decisión vigente: `MAX_ITEMS = 40`** — ver §10 (modal bloqueante a caja tradicional).
 
 ---
 
@@ -181,4 +187,75 @@ Demo → Agregar productos → 🛒 Carrito → Finalizar compra → Pagar desde
 - Backend real (pasarela Yape/Plin, validación HMAC en servidor).
 - App del personal de caja/seguridad que escanee QRs reales.
 - Boleta electrónica SUNAT en PDF.
-- PWA instalable + modo offline.
+- ~~PWA instalable + modo offline~~ ✅ hecho en 3.ª iteración (`manifest.json + sw.js` cache-first).
+
+---
+
+## 10. 🛒 RN-CAJA-RÁPIDA: tope estricto de 40 + modal bloqueante
+
+Nueva regla de negocio: la compra rápida Scan & Go acepta **máximo 40 artículos**; el artículo 41 se deriva a caja tradicional.
+
+| Cambio | Dónde |
+|--------|-------|
+| `MAX_ITEMS = 205 → 40` | `app.js:5` |
+| Módulo `isFastLimitReached() / showFastLimitModal() / hideFastLimitModal()` (validación O(1)) | `app.js` |
+| `addToCart()` y `changeQty()` bloquean el 41 con modal + `beep(false)` + toast | `app.js` |
+| `onScannedCode()` intercepta la lectura y valida antes de insertar | `app.js` |
+| `saveState()` retorna `false` y no guarda si `qty > 40` | `app.js` |
+| Modal `#fastLimitModal` con texto exacto “Límite de compras rápidas alcanzado (40 artículos). Dirígete a una caja tradicional para procesar esta compra.”, cierre con botón `Entendido` / clic fuera | `index.html` + `app.js` |
+| `.modal-overlay` (`z-index:70`) + `.modal-card` (max 420px, responsive móvil) en verde/blanco base | `styles.css` |
+| Textos UI `205 → 40` (beneficios login, carrito, progreso) | `index.html` |
+
+**Rendimiento:** validación + render + recálculo con 40 ítems medido en `0.36ms <2s` (`{qty:40, blocked41:true, under2s:true}`).
+
+---
+
+## 11. 🤖 Posición de TOBI sobre la barra de navegación
+
+El widget chocaba con la barra inferior y se recortaba a la derecha (peor en escritorio). Solo CSS, sin JS:
+
+| Cambio | Dónde |
+|--------|-------|
+| `.bot-widget` → `bottom:120px !important; right:30px !important` | `styles.css` |
+| `@media (min-width:700px)` → `bottom:120px !important; right:max(30px, calc(50% - 310px)) !important` | `styles.css` |
+| `.bot-bubble` → `margin-right:10px` + tope `min(260px, calc(100vw - 70px))` (sin desborde) | `styles.css` |
+| Cola `.bot-bubble::after` → `right:25px` (apunta al centro de la cabeza) | `styles.css` |
+
+---
+
+## 12. 🟢 Logotipo oficial (`img/Logo_Tottus.png`)
+
+| Cambio | Dónde |
+|--------|-------|
+| Texto `Tottus` del header → `<img src="img/Logo_Tottus.png" class="main-logo">` | `index.html` |
+| Texto `Tottus` del login → misma imagen | `index.html` |
+| Ícono redundante `.logo-badge` (“T”) eliminado del header | `index.html` |
+| `.main-logo` base 180px (interior) / `#view-login .main-logo` 280px (login), centrada, `filter:brightness(0) invert(1)` (blanco puro sobre verde) | `styles.css` |
+| `.app-header` con `background-color:var(--green)` sólida de respaldo | `styles.css` |
+
+Evolución del acabado: mezcla `screen` + `grayscale/invert` → eliminadas al llegar el PNG con transparencia → `brightness(0) invert(1)` final.
+
+---
+
+## 13. 📸 Fotos reales de productos (adiós emojis)
+
+| Cambio | Dónde |
+|--------|-------|
+| `PRODUCTS`: propiedad `emoji` eliminada, nueva `image` con las 14 rutas de `img/` | `app.js` |
+| Catálogo y carrito renderizan `<img src="${p.image}" class="product-image" alt="${p.name}">` | `app.js` (`renderProducts`, `renderCart`) |
+| `.product-image`: `100% / 140px / contain` en catálogo; `.cart-item .product-image` 80px compacta | `styles.css` |
+| Edad (`calcAge/isAdultUser`) e IGV (`calcTotals`) intactos | — |
+
+⚠️ Discrepancia de archivo: la ruta indicada era `img/NestleSublime.png`, pero el archivo real es `img/NestléSublime.png` (con tilde); se usó el nombre real.
+
+---
+
+## 14. Verificaciones de la 3.ª iteración
+
+| Prueba | Resultado |
+|--------|-----------|
+| Sintaxis `app.js` (`node --check`) tras cada cambio | ✅ sin errores |
+| Límite 40: llenar 40 → intentar el 41 (escáner/botón/+) → modal exacto, sin guardado, `beep(false)` | ✅ |
+| Perf 40 ítems: validación + total | ✅ `0.36ms <2s` |
+| Sin restos de `emoji` en `app.js` | ✅ 0 coincidencias |
+| Solo `styles.css` / `index.html` tocados según cada tarea (JS intacto donde se exigía) | ✅ `git diff --stat` |
