@@ -196,6 +196,7 @@ body {
 }
 .btn-dark { background: var(--green-deep); color: #fff; padding: 12px 14px; }
 .btn-ghost { background: var(--green-light); color: var(--green-deep); padding: 12px; width: 100%; border: 2px solid var(--border); }
+.btn-ghost:disabled, .btn-dark:disabled { filter: grayscale(.4); opacity: .6; cursor: not-allowed; }
 .btn-ghost.danger { color: var(--green-deep); margin-top: 8px; }
 .btn-small { background: #fff; color: var(--green-dark); padding: 9px 14px; font-size: 13px; white-space: nowrap; box-shadow: 0 3px 0 rgba(0,0,0,.12); }
 .btn-small:active { transform: translateY(2px); box-shadow: none; }

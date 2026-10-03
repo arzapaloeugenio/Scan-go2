@@ -324,7 +324,29 @@ function updateAuthUI() {
   }
 }
 
-// ---------- SCANNER (html5-qrcode universal) ----------
+// ---------- SCANNER (html5-qrcode vía CDN, con degradación a ingreso manual) ----------
+const SCANNER_UNAVAILABLE_MSG = "El escáner no está disponible. Puedes ingresar el código manualmente.";
+function isScannerLibAvailable() {
+  if (window.__html5QrcodeCdnFailed) return false;
+  return typeof window.Html5QrcodeScanner !== "undefined";
+}
+function updateScannerAvailability() {
+  const available = isScannerLibAvailable();
+  const statusEl = $("scannerStatus");
+  const btnStart = $("btnStartCamera");
+  const btnStop = $("btnStopCamera");
+  if (!available && scannerRunning) {
+    // El CDN falló con el escáner activo: liberar cámara y restablecer UI sin tocar el ingreso manual.
+    stopCamera();
+  }
+  if (btnStart) btnStart.disabled = !available;
+  if (btnStop) btnStop.disabled = !available;
+  if (!available && statusEl) statusEl.textContent = SCANNER_UNAVAILABLE_MSG;
+  if (available && statusEl && !scannerRunning && statusEl.textContent === SCANNER_UNAVAILABLE_MSG) {
+    statusEl.textContent = "Cámara detenida";
+  }
+  return available;
+}
 function onScanFailure(error) {
   // Se ignoran los errores de lectura por frame para no saturar la UI
 }
@@ -333,12 +355,12 @@ async function startCamera() {
   if (scannerRunning) return;
   const statusEl = $("scannerStatus");
   try {
-    if (typeof Html5QrcodeScanner === "undefined") {
-      if (statusEl) statusEl.textContent = "⚠️ Librería de escaneo no cargada. Usa ingreso manual.";
+    if (!isScannerLibAvailable()) {
+      updateScannerAvailability();
       toast("⚠️ Cámara no disponible, usa código manual");
       return;
     }
-    const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+    const html5QrcodeScanner = new window.Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
     window._html5QrcodeScanner = html5QrcodeScanner;
     scannerRunning = true;
     scanT0 = performance.now();
@@ -357,7 +379,14 @@ async function startCamera() {
     html5QrcodeScanner.render(onScanSuccess, onScanFailure);
   } catch (e) {
     scannerRunning = false;
-    if (statusEl) statusEl.textContent = "⚠️ No se pudo abrir la cámara. Usa ingreso manual.";
+    window._html5QrcodeScanner = null;
+    try {
+      const readerEl = $("reader");
+      if (readerEl) readerEl.innerHTML = "";
+    } catch { /* noop */ }
+    // No se reintenta: se deja el ingreso manual operativo y se refleja el estado real del CDN.
+    updateScannerAvailability();
+    if (isScannerLibAvailable() && statusEl) statusEl.textContent = "⚠️ No se pudo abrir la cámara. Usa ingreso manual.";
     toast("⚠️ Cámara no disponible, usa código manual");
   }
 }
@@ -771,6 +800,16 @@ function init() {
   renderCodesHelp();
   renderAll();
   updateAuthUI();
+  // Estado inicial del escáner según el CDN (no bloquea el resto de la app).
+  updateScannerAvailability();
+  const cdnScript = document.getElementById("html5qrcode-cdn");
+  if (cdnScript && !cdnScript._scanGoErrorBound) {
+    cdnScript._scanGoErrorBound = true;
+    cdnScript.addEventListener("error", () => {
+      window.__html5QrcodeCdnFailed = true;
+      updateScannerAvailability();
+    });
+  }
   if (order && getUser()) {
     restoreOrderUI();
     toast("🔄 Retomaste tu pago pendiente");
