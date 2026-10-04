@@ -13,7 +13,7 @@
 
 | ID | Objetivo | Estado |
 |----|----------|--------|
-| O1 | Lector de código de barras desde el celular | ✅ `BarcodeDetector` + ingreso manual |
+| O1 | Lector de código de barras desde el celular | ✅ `Html5QrcodeScanner` (CDN `html5-qrcode`) + ingreso manual con degradación |
 | O2 | Carrito virtual (máx. 40 productos, compra rápida) | ✅ `MAX_ITEMS=40` con barra de progreso, bloqueo y modal a caja tradicional |
 | O15 | RN-CAJA-RÁPIDA: tope 40 + modal bloqueante | ✅ `isFastLimitReached/showFastLimitModal` + `#fastLimitModal` responsive; validación+render+total <2s |
 | O3 | IGV 18 % desglosado (precios incluyen IGV) | ✅ `Subtotal = Total / 1.18` |
@@ -38,9 +38,9 @@
 └──────┬──────┘                      └──────────┘                   │ tottus_order │
        │ CSS verde/blanco + animaciones        ▲ cámara + QR        │ tottus_history│
        ▼                                       │                   └──────────────┘
-┌─────────────┐   BarcodeDetector   ┌───────────────────┐   qrcode@1.5.3 (CDN)
-│ styles.css  │   getUserMedia  ───►│ video + canvas QR │ ◄── con fallback offline
-└─────────────┘                     └───────────────────┘   manifest.json + sw.js (PWA)
+┌─────────────┐   html5-qrcode (CDN)  ┌───────────────────┐   qrcode@1.5.3 (CDN)
+│ styles.css  │   Html5QrcodeScanner ──►│ #reader + #scanner │ ◄── con fallback offline
+└─────────────┘   render/clear        │ status/manual     │   (QRs de pago) + manifest.json + sw.js (PWA)
 ```
 
 - **Sin servidor:** toda la lógica corre en el cliente. El “pago”, la “caja” y “seguridad” son simulaciones con botones demo + ingreso manual de 6 dígitos (en producción se reemplazarían por pasarela real y escáner del personal).
@@ -50,9 +50,9 @@
 
 | Archivo | Rol | Contenido clave |
 |---------|-----|-----------------|
-| `index.html` | Estructura + 5 vistas + nav inferior | header, search-bar, `#view-login/home/scanner/cart/checkout`, `loginDNI/loginBirth`, `#cardForm`, `#historyCard`, `#payTimerHint`, `#fastLimitModal`, `#qrCajaCanvas`, `#qrSalidaCanvas`, inputs `cajaInput/segInput`, `manifest.json` + `qrcode@1.5.3` + `app.js` |
-| `styles.css` | Diseño mobile-first verde/blanco | variables CSS, animaciones, `.restricted-tag`, `.perf-hint`, `.card-form`, `.hist-list`, `.modal-overlay/.modal-card` responsive, TOBI, confeti, `@media print` (solo ticket) |
-| `app.js` | Lógica de negocio | catálogo 14, `calcAge/isAdultUser`, `MAX_ITEMS=40`, `isFastLimitReached/showFastLimitModal`, `scanT0/payT0`, `ORDER_KEY/HISTORY_KEY`, `saveOrder/restoreOrderUI`, `beep()`, validación tarjeta, checkout por pasos, TOBI, confeti |
+| `index.html` | Estructura + 5 vistas + nav inferior | header, search-bar, `#view-login/home/scanner/cart/checkout`, `#reader`, `#scannerStatus`, `#btnStartCamera/#btnStopCamera`, `#manualCode/#btnManualAdd`, `#codesList`, `#scanResult`, `loginDNI/loginBirth`, `#cardForm`, `#historyCard`, `#payTimerHint`, `#fastLimitModal`, `#qrCajaCanvas`, `#qrSalidaCanvas`, inputs `cajaInput/segInput`, `manifest.json` + `qrcode@1.5.3` + `#html5qrcode-cdn` (`https://unpkg.com/html5-qrcode`) + `app.js` |
+| `styles.css` | Diseño mobile-first verde/blanco | variables CSS, animaciones, `.restricted-tag`, `.perf-hint`, `.card-form`, `.hist-list`, `.modal-overlay/.modal-card` responsive, `.scanner-viewport/.scanner-status/.scanner-actions/.scan-result/.codes-list`, estado `:disabled` de botones del escáner, TOBI, confeti, `@media print` (solo ticket) |
+| `app.js` | Lógica de negocio | catálogo 14, `calcAge/isAdultUser`, `MAX_ITEMS=40`, `isFastLimitReached/showFastLimitModal`, `scanT0/payT0`, `ORDER_KEY/HISTORY_KEY`, `saveOrder/restoreOrderUI`, `beep()`, escáner `isScannerLibAvailable/updateScannerAvailability/SCANNER_UNAVAILABLE_MSG/startCamera/stopCamera/onScanSuccess/onScanFailure/onScannedCode/renderCodesHelp` (`window._html5QrcodeScanner`, `scannerRunning`, `window.__html5QrcodeCdnFailed`), validación tarjeta, checkout por pasos, TOBI, confeti |
 | `manifest.json` + `sw.js` | PWA mínima | manifest instalable + SW cache-first html/css/js |
 
 ## 4. Funcionalidades detalladas
@@ -67,11 +67,23 @@
 - `discount = round((1 - price/oldPrice)*100)`; etiqueta `-%` + badge `+18` (`.restricted-tag`) y nota `🔞 Venta solo mayores de 18`.
 - `addToCart()` bloquea licor si `!isAdultUser()` con toast RN02. Buscador + filtros `Todo / Ofertas`.
 
-### 4.3 Lector de barras (`startCamera`, `loopDetect`, `onScannedCode`, RNF02 + RN-CAJA-RÁPIDA)
-- `getUserMedia({facingMode: "environment"})` + `BarcodeDetector` (`ean_13, ean_8, code_128, qr_code`), sondeo cada ~400 ms con antirrebote 1.5 s.
-- **Perf RNF02:** `scanT0 = performance.now()` antes de `detect()` / click manual; `onScannedCode()` muestra `⏱️ Xs (meta <3s ✅/⚠️)` discreto en verde (`.perf-hint`) + `beep()` (880Hz ok / 220Hz error).
+### 4.3 Lector de barras (`Html5QrcodeScanner` por CDN + ingreso manual, RNF02 + RN-CAJA-RÁPIDA)
+- **Carga externa (sin copia local, sin npm):** `index.html` carga `<script id="html5qrcode-cdn" src="https://unpkg.com/html5-qrcode" onerror="window.__html5QrcodeCdnFailed=true">` antes de `app.js`. **No existe copia local** de `html5-qrcode` ni instalación por npm; si el CDN no responde, el escáner queda fuera de servicio y la app sigue funcionando con ingreso manual.
+- **Disponibilidad antes de usar:** `isScannerLibAvailable()` retorna `false` si `window.__html5QrcodeCdnFailed` está marcado o si `typeof window.Html5QrcodeScanner === "undefined"`. `updateScannerAvailability()` (llamada en `init()` sin bloquear el resto) deshabilita solo `#btnStartCamera` / `#btnStopCamera` (`disabled = !available`), muestra en `#scannerStatus` el mensaje `SCANNER_UNAVAILABLE_MSG` (“El escáner no está disponible. Puedes ingresar el código manualmente.”) y, si el fallo llega con el escáner activo (`scannerRunning`), invoca `stopCamera()` para liberar la cámara y limpiar `#reader`. Con la librería disponible y sin lectura en curso, restaura `#scannerStatus` a “Cámara detenida”. El script también suscribe una sola vez el evento `error` de `#html5qrcode-cdn` (guarda `_scanGoErrorBound`) para degradar en caliente.
+- **Inicialización (`startCamera`, vía `#btnStartCamera`):** con guarda `if (scannerRunning) return` (sin inicializaciones múltiples ni listeners duplicados: `init()` suscribe cada botón una sola vez); verifica `isScannerLibAvailable()` y, si no está disponible, llama `updateScannerAvailability()` + `toast("⚠️ Cámara no disponible, usa código manual")` sin crear el objeto (evita `Html5QrcodeScanner is not defined`). Si está disponible, crea `new window.Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false)`, guarda en `window._html5QrcodeScanner`, marca `scannerRunning = true`, fija `scanT0 = performance.now()` y muestra “📷 Apunta al código de barras...”. Luego invoca `render(onScanSuccess, onScanFailure)` sobre el contenedor `#reader` (`#view-scanner`).
+- **Lectura exitosa (`onScanSuccess(decodedText)` → `onScannedCode`):** hace `clear()` del lector, pone `scannerRunning = false`, limpia `window._html5QrcodeScanner`, muestra “✅ Código leído” en `#scannerStatus` y delega en `onScannedCode(decodedText)` (misma vía que el ingreso manual: valida tope 40, `addToCart()`, `beep()`, pinta `#scanResult`). El `catch()` del `clear()` también restablece el estado y procesa el código.
+- **Errores:**
+  1. *Fallo de carga del CDN:* `onerror` marca `window.__html5QrcodeCdnFailed` (+ listener `error` en `init()`); `updateScannerAvailability()` deshabilita escaneo y avisa en `#scannerStatus`.
+  2. *Librería ausente en el global:* `isScannerLibAvailable() === false`; `startCamera()` retorna temprano con toast, sin `new`.
+  3. *Permiso de cámara rechazado / cámara no disponible:* caen al `catch` de `startCamera()`; si la librería sí cargó, `#scannerStatus` muestra “⚠️ No se pudo abrir la cámara. Usa ingreso manual.” + toast; siempre se limpia `#reader`.
+  4. *Error durante la inicialización:* mismo `catch`: `scannerRunning = false`, `window._html5QrcodeScanner = null`, `#reader` vaciado, `updateScannerAvailability()` refleja el estado real; sin reintentos automáticos.
+  5. *Errores por frame:* `onScanFailure(error)` los ignora a propósito para no saturar la UI.
+  6. *Lectura inválida o no reconocida:* `onScannedCode()` → `addToCart()` con `toast("❌ Código no encontrado: " + code)`; con tope 40 muestra `⛔ Límite de 40 alcanzado` + `#fastLimitModal` + `beep(false)` sin insertar.
+  7. *Cierre y limpieza (`stopCamera`, vía `#btnStopCamera`):* `await active.clear()` si existe `window._html5QrcodeScanner`, `scannerRunning = false`, `#reader` vaciado y, solo si `#view-scanner` está visible, `#scannerStatus` vuelve a “Cámara detenida”. `showView(name)` lo invoca al salir del scanner; el cierre de sesión también lo invoca.
+  8. *Alternativa manual (siempre operativa):* `#manualCode` + `#btnManualAdd` → `onScannedCode(code)` con `scanT0` para el cronómetro; `#codesList` (vía `renderCodesHelp()`) ofrece los códigos de prueba del catálogo; el resultado se pinta en `#scanResult`. El ingreso manual nunca se deshabilita por el estado del CDN.
+- **Perf RNF02:** `scanT0 = performance.now()` al iniciar cámara o al pulsar manual; `onScannedCode()` muestra `⏱️ Xs (meta <3s ✅/⚠️)` discreto en verde (`.perf-hint`) + `beep()` (880Hz ok / 220Hz error).
 - **Intercepción tope 40:** `onScannedCode()` valida `isFastLimitReached(1)` antes de `addToCart()`; si es el artículo 41 muestra `⛔ Límite de 40 alcanzado` + abre `#fastLimitModal` y no inserta.
-- Fallback: ingreso manual + lista de códigos de prueba (`renderCodesHelp`). Código desconocido → toast `❌ Código no encontrado`.
+- Nota histórica: la implementación anterior basada en `BarcodeDetector` + `getUserMedia()` directo (sondeo ~400 ms) fue reemplazada por `Html5QrcodeScanner`; ya no es la vía vigente.
 
 ### 4.4 Carrito (`addToCart`, `changeQty`, `renderCart`, RN-CAJA-RÁPIDA 40)
 - Mapa `cart = {code: qty}` persistido en `tottus_cart` vía `saveState()` (retorna `false` y no guarda si `qty > 40`).
@@ -180,8 +192,8 @@ python3 -m http.server 8000
 ## 8. Limitaciones conocidas (demo)
 - Sin backend: pago, caja y seguridad son simulados; cualquiera puede pulsar “validar”. `localStorage` (`tottus_cart/order/history/user`) es manipulable; en producción usar pasarela real + HMAC/JWT en servidor con nonces.
 - Firma QR demo (`simpleHash` + secreto en cliente); tarjeta demo solo valida formato.
-- `BarcodeDetector` no existe en todos los navegadores (se usa ingreso manual + beep).
-- QR por CDN requiere internet; sin él solo placeholder. SW cachea app shell, no el CDN.
+- Escáner `html5-qrcode` exclusivamente por CDN (`https://unpkg.com/html5-qrcode`, sin copia local ni npm): requiere internet y permiso de cámara; si el CDN falla, el escaneo se deshabilita con el aviso en `#scannerStatus` y se continúa por ingreso manual (`#manualCode/#btnManualAdd`) + `beep()`. El SW cachea el app shell, no el CDN.
+- QR de pago por CDN (`qrcode@1.5.3`) requiere internet; sin él solo placeholder (`fallbackQR()`). SW cachea app shell, no los CDN.
 
 ## 9. Trabajo futuro
 - [ ] Backend (pasarela Yape/Plin/tarjeta real, API de tickets, validación HMAC en servidor).
@@ -202,3 +214,15 @@ python3 -m http.server 8000
 4. Reúso: validar caja dos veces → “QR ya usado”.
 5. Código erróneo de cajero/seguridad → “incorrecto”.
 6. Recargar a mitad del flujo: carrito persiste en `tottus_cart` y `order` persiste en `tottus_order` con QR redibujado (ya no se pierde).
+7. Fallback del lector: con CDN disponible `#btnStartCamera/#btnStopCamera` habilitados y `#manualCode/#btnManualAdd` operativo; simulando CDN caído (`window.__html5QrcodeCdnFailed = true` o bloqueo de `https://unpkg.com/html5-qrcode`), `#scannerStatus` muestra “El escáner no está disponible. Puedes ingresar el código manualmente.”, los botones de cámara quedan `disabled`, el ingreso manual sigue agregando y el catálogo/carrito/TOBI no se afectan.
+
+## Historial de cambios técnicos
+
+### Actualización del lector y fallback manual (2026-10-03)
+- Se reemplazó la implementación basada en `BarcodeDetector` y `getUserMedia()` directo por `Html5QrcodeScanner` (`new window.Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false)` + `render(onScanSuccess, onScanFailure)`).
+- La librería `html5-qrcode` se carga exclusivamente mediante CDN (`<script id="html5qrcode-cdn" src="https://unpkg.com/html5-qrcode">` en `index.html`).
+- No se añadió copia local ni dependencia instalada mediante npm.
+- Flujo actualizado: la página intenta cargar el CDN → `isScannerLibAvailable()` comprueba `window.__html5QrcodeCdnFailed` y `window.Html5QrcodeScanner` → si está disponible, `updateScannerAvailability()` habilita `#btnStartCamera/#btnStopCamera` y `startCamera()` inicializa el lector en `#reader`; el código detectado se procesa con `onScannedCode()` → `addToCart()`; `stopCamera()` hace `clear()`, vacía `#reader` y restaura “Cámara detenida”.
+- Se añadió validación previa antes de inicializar el escáner y manejo de `onerror` del script (`window.__html5QrcodeCdnFailed`) más suscripción única al evento `error` en `init()`.
+- Si el CDN falla, la app no crea `Html5QrcodeScanner` (evita `Html5QrcodeScanner is not defined`), deshabilita solo la función de escaneo, muestra “El escáner no está disponible. Puedes ingresar el código manualmente.” en `#scannerStatus` y mantiene habilitado el ingreso manual (`#manualCode`, `#btnManualAdd`, `#codesList`, `#scanResult`).
+- Un fallo del lector no bloquea catálogo, carrito, TOBI ni checkout: `init()` evalúa la disponibilidad sin condicionar `renderAll()`/`updateAuthUI()`.
