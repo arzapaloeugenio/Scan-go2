@@ -2,7 +2,7 @@
 
 > Documento de trabajo: segunda iteración del proyecto **Tottus Scan & Go** (Universidad Norbert Wiener – Software 1, Proyecto Integrador).
 > Fecha: septiembre 2026 · Equipo: Arzapalo, Alva, Cabrejos, Condori · Ciclo: IS4M1.
-> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). Todo el código se genera solo con **Opencode**.
+> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. Todo el código se genera solo con **Opencode**.
 
 Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 
@@ -259,3 +259,32 @@ Evolución del acabado: mezcla `screen` + `grayscale/invert` → eliminadas al l
 | Perf 40 ítems: validación + total | ✅ `0.36ms <2s` |
 | Sin restos de `emoji` en `app.js` | ✅ 0 coincidencias |
 | Solo `styles.css` / `index.html` tocados según cada tarea (JS intacto donde se exigía) | ✅ `git diff --stat` |
+
+---
+
+## 15. 🎨 Paleta alineada al logotipo Tottus (solo `styles.css`)
+
+Ajuste visual para que la interfaz concuerde con `img/Logo_Tottus.png`. Solo colores; sin cambios de estructura, lógica, lector ni TOBI.
+
+| Paleta aplicada | Valor |
+|-----------------|-------|
+| Verde principal | `#40a629` (botones, cabecera-detalles, acciones importantes) |
+| Verde secundario | `#6dba4d` (gradiente progreso, detalles) |
+| Verde oscuro | `#3f752f` (textos destacados, bordes, estados activos) |
+| Verde profundo | `#01855d` (enlaces / interactivos) |
+| Amarillo principal | `#feeb15` (solo promociones, avisos y énfasis) |
+| Amarillo suave | `#fcf6c0` (fondos de avisos) |
+| Fondo general / superficie | `#ffffff` / `#f5f5f5` |
+| Texto principal | `#263238` |
+
+| Cambio | Dónde |
+|--------|-------|
+| Variables `:root` actualizadas a la paleta del logo (`--green`, `--green-secondary`, `--green-dark`, `--green-deep`, `--yellow`, `--yellow-soft`, `--bg:#f5f5f5`, `--text:#263238`, `--border:#e0e0e0`) | `styles.css` |
+| Cabecera a blanco con detalles verdes (`background:#fff`, `border-bottom:3px solid var(--green)`, `search-bar` con borde suave) | `styles.css` (`.app-header`) |
+| Logotipo sin filtro `brightness(0) invert(1)` para mostrar colores originales; ruta, tamaño (180px / 280px) y proporciones intactas | `styles.css` (`.main-logo`) |
+| Botones principales a `#40a629` sólido con texto blanco; secundarios a blanco con borde `#40a629`; `btn-dark`/activos a `#3f752f` | `styles.css` (`.btn-primary`, `.add-btn`, `.btn-scan`, `.btn-ghost`, `.btn-dark`, `.chip-filter.active`, `.bottom-nav .active`) |
+| Amarillo solo en promociones/avisos (`promo-banner`, `login-pill`, `discount-tag`, `qr-secure-note` en `#fcf6c0` con texto `#263238`) | `styles.css` |
+| Tarjetas blancas con bordes suaves y fondo general `#f5f5f5`; inputs y fondos saturados pasan a blanco/gris claro | `styles.css` (`body`, `.card`, `.login-card input`, `.product-img`, `.ticket pre`) |
+| TOBI, lector (`#reader`), `index.html` y `app.js` intactos; sin nuevas dependencias | — |
+
+**Validación:** texto legible sobre blanco/amarillo, botones con contraste, sin saturación de verde/amarillo, layout móvil intacto (`max-width:640px`, `@media 700px` sin cambios).
