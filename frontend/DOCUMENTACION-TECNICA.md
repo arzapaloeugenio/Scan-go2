@@ -58,8 +58,11 @@
 ## 4. Funcionalidades detalladas
 
 ### 4.1 Autenticación (`getUser`, `updateAuthUI`, RN02)
-- Formulario estricto: nombre (≥3), email válido, clave (≥4, 👁️), **DNI 8 dígitos** (`/^\d{8}$/`), **fecha nacimiento** obligatoria. `calcAge()` + `isAdult` → guarda `{name, email, dni, birth, age, isAdult}` en `tottus_user`.
-- **Botón demo** `#btnDemo`: entra como adulto `Cliente Demo` (26 años) para exposición.
+- Bienvenida minimalista (`#view-login`): tarjeta verde con logotipo blanco (`img/Logo_Tottus-blanco.png`, texto blanco + puntos amarillos, transparente y recortada al contenido) y tres botones de ancho completo (`#btnGoLogin` amarillo, `#btnGoRegister` blanco, `#btnDemo` transparente con borde blanco; `min-height:52px`, `max-width:380px` internos). Estado inicial: solo bienvenida visible; ambos formularios con `hidden` + `display:none !important`.
+- Apertura por JavaScript con botones `type="button"` (sin `href="#..."`): “Iniciar sesión” oculta el intro y muestra solo `#loginCard`; “Crear cuenta” muestra solo `#loginForm` (titulado “Crear cuenta”); “Volver” (`#btnBackToWelcome` / `#btnBackToWelcomeReg`) restaura la bienvenida, devuelve el foco al botón de origen y limpia el hash vía `history.replaceState` sin recargar. Guardia `window._emailLoginBound` evita listeners duplicados.
+- Login por correo (`#emailLoginForm`): solo email + contraseña con etiquetas visibles, toggle 👁️ (`#btnToggleAuthPass`), enlace visual “¿Olvidaste tu contraseña?” (toast, sin recuperación real) y errores bajo cada campo (`.field-error`). Valida formato de email y contraseña no vacía con `preventDefault`; la contraseña nunca se guarda en `localStorage` ni se registra; reutiliza el perfil guardado si el correo coincide (demo local).
+- Registro (`#loginForm`): nombre (≥3), email válido, clave (≥4, 👁️), **DNI 8 dígitos** (`/^\d{8}$/`), **fecha nacimiento** obligatoria. `calcAge()` + `isAdult` → guarda `{name, email, dni, birth, age, isAdult}` en `tottus_user`.
+- **Botón demo** `#btnDemo` (en el hero): entra como adulto `Cliente Demo` (26 años) sin formularios ni credenciales.
 - Menor: header `(menor 🔞)` + bloqueo de licores; sesión persistente; “Salir” borra usuario, detiene cámara y timer QR.
 
 ### 4.2 Catálogo y ofertas (`renderProducts`, RN02)
@@ -226,3 +229,9 @@ python3 -m http.server 8000
 - Se añadió validación previa antes de inicializar el escáner y manejo de `onerror` del script (`window.__html5QrcodeCdnFailed`) más suscripción única al evento `error` en `init()`.
 - Si el CDN falla, la app no crea `Html5QrcodeScanner` (evita `Html5QrcodeScanner is not defined`), deshabilita solo la función de escaneo, muestra “El escáner no está disponible. Puedes ingresar el código manualmente.” en `#scannerStatus` y mantiene habilitado el ingreso manual (`#manualCode`, `#btnManualAdd`, `#codesList`, `#scanResult`).
 - Un fallo del lector no bloquea catálogo, carrito, TOBI ni checkout: `init()` evalúa la disponibilidad sin condicionar `renderAll()`/`updateAuthUI()`.
+
+### Bienvenida minimalista y acceso por pasos (2026-10-04)
+- La vista inicial muestra solo la tarjeta verde (logo blanco `img/Logo_Tottus-blanco.png`, etiqueta, título, descripción, 3 beneficios) y los botones “Iniciar sesión” / “Crear cuenta” / “Probar demo” a ancho completo (`52px`, `gap:12px`, `max-width:380px`).
+- Se eliminaron el botón “Comenzar compra” (`href="#loginForm"`) y la tarjeta blanca de beneficios; cada formulario se abre solo por JS en la misma pantalla (login `#loginCard`, registro `#loginForm`), sin redirigir ni recargar.
+- Corrección de visibilidad inicial: `.auth-card { display:grid }` vencía al atributo `hidden`; se añadieron reglas `#loginCard[hidden]` / `#loginForm[hidden] { display:none !important }` y limpieza del hash (`#loginForm`/`#registerForm`) con `history.replaceState` al iniciar y al volver.
+- Logotipos: `img/Logo_Tottus.png` (320×320 con 135 px transparentes arriba/abajo, 0 píxeles blancos; el blanco era solo CSS) → recorte `img/Logo_Tottus-cropped.png` (304×66) → variante blanca `img/Logo_Tottus-blanco.png` (verdes a blanco, amarillos conservados). Bienvenida usa la variante blanca sin fondos/cápsulas (`190px/65vw`, `170px` móvil, `200px` escritorio); cabecera conserva el original.

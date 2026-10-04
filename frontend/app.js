@@ -851,6 +851,121 @@ function init() {
     $("btnTogglePass").textContent = i.type === "password" ? "👁️" : "🙈";
   });
 
+  // Acceso minimalista: botones reales abren cada formulario por JavaScript (sin hash)
+  if (!window._emailLoginBound) {
+    window._emailLoginBound = true;
+    // Limpia hash heredado (#loginForm/#registerForm): conserva la página sin recargar ni desplazar
+    if (/^#(loginForm|registerForm|loginCard)$/.test(location.hash || "")) {
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+    const introSel = [".login-pill", ".login-hero h1", ".hero-desc", ".hero-steps", ".hero-auth"];
+    let lastOpener = null;
+    function setIntroHidden(hidden) {
+      introSel.forEach((s) => {
+        const el = document.querySelector("#view-login " + s);
+        if (el) el.hidden = hidden;
+      });
+    }
+    function showEmailLogin(opener) {
+      lastOpener = opener || null;
+      setIntroHidden(true);
+      const reg = $("loginForm");
+      if (reg) reg.hidden = true;
+      const card = $("loginCard");
+      if (card) card.hidden = false;
+      const mail = $("authEmail");
+      if (mail) setTimeout(() => mail.focus({ preventScroll: false }), 50);
+    }
+    function showRegister(opener) {
+      lastOpener = opener || null;
+      setIntroHidden(true);
+      const card = $("loginCard");
+      if (card) card.hidden = true;
+      const reg = $("loginForm");
+      if (reg) reg.hidden = false;
+      const name = $("loginName");
+      if (name) setTimeout(() => name.focus({ preventScroll: false }), 50);
+    }
+    function showWelcome() {
+      const card = $("loginCard");
+      if (card) card.hidden = true;
+      const reg = $("loginForm");
+      if (reg) reg.hidden = true;
+      setIntroHidden(false);
+      if (/^#(loginForm|registerForm|loginCard)$/.test(location.hash || "")) {
+        history.replaceState(null, "", location.pathname + location.search);
+      }
+      ["authEmailError", "authPassError"].forEach((id) => {
+        const p = $(id);
+        if (p) p.hidden = true;
+      });
+      ["authEmail", "authPass"].forEach((id) => {
+        const i = $(id);
+        if (i) i.removeAttribute("aria-invalid");
+      });
+      const hero = document.querySelector("#view-login .login-hero");
+      if (hero) hero.scrollIntoView({ block: "start" });
+      if (lastOpener) lastOpener.focus({ preventScroll: true });
+      lastOpener = null;
+    }
+    const btnGoLogin = $("btnGoLogin");
+    if (btnGoLogin) btnGoLogin.addEventListener("click", () => showEmailLogin(btnGoLogin));
+    const btnGoRegister = $("btnGoRegister");
+    if (btnGoRegister) btnGoRegister.addEventListener("click", () => showRegister(btnGoRegister));
+    const btnBack = $("btnBackToWelcome");
+    if (btnBack) btnBack.addEventListener("click", showWelcome);
+    const btnBackReg = $("btnBackToWelcomeReg");
+    if (btnBackReg) btnBackReg.addEventListener("click", showWelcome);
+    const btnForgot = $("btnForgotPass");
+    if (btnForgot) btnForgot.addEventListener("click", () => toast("Recuperación no disponible en la demo"));
+    const btnToggleAuth = $("btnToggleAuthPass");
+    if (btnToggleAuth) btnToggleAuth.addEventListener("click", () => {
+      const i = $("authPass");
+      if (!i) return;
+      i.type = i.type === "password" ? "text" : "password";
+      btnToggleAuth.textContent = i.type === "password" ? "👁️" : "🙈";
+    });
+    const emailForm = $("emailLoginForm");
+    if (emailForm) emailForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const email = ($("authEmail").value || "").trim();
+      const pass = $("authPass").value || "";
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      const errMail = $("authEmailError");
+      const errPass = $("authPassError");
+      if (errMail) {
+        errMail.hidden = emailOk;
+        if (!emailOk) errMail.textContent = "Ingresa un correo válido.";
+      }
+      $("authEmail").setAttribute("aria-invalid", String(!emailOk));
+      const passOk = pass.length > 0;
+      if (errPass) {
+        errPass.hidden = passOk;
+        if (!passOk) errPass.textContent = "Ingresa tu contraseña.";
+      }
+      $("authPass").setAttribute("aria-invalid", String(!passOk));
+      if (!emailOk || !passOk) return;
+      // Demostración local: se reutiliza el perfil guardado si el correo coincide;
+      // la contraseña nunca se almacena ni se registra.
+      let profile = null;
+      try {
+        const prev = JSON.parse(localStorage.getItem("tottus_user") || "null");
+        if (prev && prev.email && String(prev.email).toLowerCase() === email.toLowerCase()) profile = prev;
+      } catch { profile = null; }
+      if (!profile) {
+        const base = email.split("@")[0].replace(/[._-]+/g, " ").trim() || "Cliente";
+        const name = base.replace(/\b\w/g, (c) => c.toUpperCase());
+        profile = { name, email, dni: "", birth: "", age: null, isAdult: true };
+      }
+      try { localStorage.setItem("tottus_user", JSON.stringify(profile)); } catch { /* noop */ }
+      $("authPass").value = "";
+      showWelcome();
+      updateAuthUI();
+      toast("👋 Bienvenido/a, " + String(profile.name).split(" ")[0]);
+      botSay(`👋 <b>¡Hola, ${String(profile.name).split(" ")[0]}!</b> Soy <b>Tobi</b> 🤖. Escanea con 📷 <b>Escanear</b>, paga desde tu celular y valida en caja y salida. ¡Sin colas!`);
+    });
+  }
+
   // TOBI: apertura/cierre solo desde el cuerpo con la "T"
   document.querySelector('.bot-body').addEventListener('click', (event) => {
     event.stopPropagation();

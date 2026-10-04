@@ -35,25 +35,49 @@
     <!-- VISTA: LOGIN -->
     <section id="view-login" class="view">
       <div class="login-hero">
-        <div class="hero-bubbles"><span></span><span></span><span></span><span></span></div>
-        <div class="login-logo"><img src="img/Logo_Tottus.png" class="main-logo" alt="Tottus" /></div>
-        <div class="login-pill">✨ SCAN &amp; GO · DEMO</div>
-        <h1>Compra sin colas 🛒💨</h1>
-        <p>Escanea, paga desde tu celular y sal validado. Todo en verde.</p>
+        <div class="hero-bubbles" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <div class="login-logo"><img src="img/Logo_Tottus-blanco.png" class="main-logo" alt="Tottus" /></div>
+        <div class="login-pill">SCAN &amp; GO · DEMO</div>
+        <h1>Compra sin colas</h1>
+        <p class="hero-desc">Escanea y paga desde tu celular. Sin colas.</p>
         <div class="hero-steps">
           <div>📷<b>Escanea</b></div>
           <div>💳<b>Paga</b></div>
           <div>🛡️<b>Valida y sal</b></div>
         </div>
-        <ul class="login-benefits">
-          <li>📷 Lector de barras integrado</li>
-          <li>🛒 Carrito virtual hasta 40 productos</li>
-          <li>🧾 IGV 18% desglosado + ofertas</li>
-          <li>⏱️ QR temporal anti-capturas</li>
-        </ul>
+        <div class="hero-auth">
+          <button type="button" class="hero-btn hero-btn-primary" id="btnGoLogin">Iniciar sesión</button>
+          <button type="button" class="hero-btn hero-btn-secondary" id="btnGoRegister">Crear cuenta</button>
+          <button type="button" class="hero-btn hero-btn-tertiary" id="btnDemo">Probar demo</button>
+        </div>
       </div>
-      <form id="loginForm" class="card login-card" autocomplete="on">
+      <div id="loginCard" class="card auth-card" hidden>
         <h2>Iniciar sesión</h2>
+        <p class="muted small">Ingresa para continuar con Scan &amp; Go</p>
+        <form id="emailLoginForm" novalidate>
+          <label>
+            Correo electrónico
+            <input type="email" id="authEmail" placeholder="tucorreo@mail.com" required autocomplete="email" />
+          </label>
+          <p class="field-error" id="authEmailError" hidden></p>
+          <label>
+            Contraseña
+            <span class="pass-wrap">
+              <input type="password" id="authPass" placeholder="Tu contraseña" required autocomplete="current-password" />
+              <button type="button" class="pass-toggle" id="btnToggleAuthPass" aria-label="Ver contraseña">👁️</button>
+            </span>
+          </label>
+          <p class="field-error" id="authPassError" hidden></p>
+          <div class="auth-links">
+            <button type="button" class="link-btn" id="btnForgotPass">¿Olvidaste tu contraseña?</button>
+          </div>
+          <button type="submit" class="btn-primary">Ingresar</button>
+          <button type="button" class="btn-ghost" id="btnBackToWelcome">Volver</button>
+        </form>
+      </div>
+      <form id="loginForm" class="card login-card" autocomplete="on" hidden>
+        <h2>Crear cuenta</h2>
+        <p class="muted small">Crea tu cuenta para comprar sin colas</p>
         <label>
           Nombre y apellido
           <input type="text" id="loginName" placeholder="Ej: María Quispe" required minlength="3" />
@@ -78,10 +102,8 @@
           <input type="date" id="loginBirth" required />
         </label>
         <p class="muted small">🔞 RN02: licores solo +18 años. Se valida con tu fecha de nacimiento.</p>
-        <button type="submit" class="btn-primary">Ingresar a la tienda →</button>
-        <div class="demo-divider"><span>o demo rápida</span></div>
-        <button type="button" class="btn-demo" id="btnDemo">⚡ Entrar sin registro (Demo)</button>
-        <p class="muted small">Demo académica: botón verde para entrar al instante. Datos solo en tu celular.</p>
+        <button type="submit" class="btn-primary">Crear mi cuenta →</button>
+        <button type="button" class="btn-ghost" id="btnBackToWelcomeReg">Volver</button>
       </form>
     </section>
 

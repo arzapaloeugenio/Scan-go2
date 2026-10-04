@@ -288,3 +288,59 @@ Ajuste visual para que la interfaz concuerde con `img/Logo_Tottus.png`. Solo col
 | TOBI, lector (`#reader`), `index.html` y `app.js` intactos; sin nuevas dependencias | — |
 
 **Validación:** texto legible sobre blanco/amarillo, botones con contraste, sin saturación de verde/amarillo, layout móvil intacto (`max-width:640px`, `@media 700px` sin cambios).
+
+---
+
+## 16. 📱 Estructura móvil compacta (solo `styles.css`)
+
+| Cambio | Dónde |
+|--------|-------|
+| Cabecera a la mitad: `padding:8px 16px`, radio `16px`, borde inferior gris `1px`; logo `120px` + carrito `40px` en la misma fila | `.app-header`, `.header-inner`, `.main-logo`, `.icon-btn` |
+| Buscador a ancho completo con `flex-wrap` (`input flex:1 1 120px/min-width:0`, chips `12px` sin desborde; “Todo” y “Ofertas” siempre visibles) | `.search-bar`, `.chip-filter` |
+| Bordes verdes gruesos eliminados (`login-card/totals-card/qr` de 6–8px a 3px o ninguno; resto a `1px` gris `#dfe5dd`) y sombras ligeras | `styles.css` general |
+| Ancho seguro `16px` laterales (`.app-main`), `overflow-x:hidden` global y `min-width:0` en flex/grid | `html, body, .app-main, .product-grid, .hero-steps, .steps-mini` |
+| Fondo `#f5f7f4`, superficies `#ffffff`, esquinas `14–16px`, espaciado `8/12/16px` | `:root`, `.card` |
+
+---
+
+## 17. 🏷️ Promoción, pasos y tarjeta de escaneo (solo `styles.css`)
+
+| Cambio | Dónde |
+|--------|-------|
+| Promo compacta: ticker repetido oculto (`display:none`), fondo `#fcf6c0`, texto verde oscuro, CTA “Ver ofertas” en `#feeb15` con `min-height:44px` | `.promo-banner`, `.promo-ticker`, `.promo-main` |
+| 4 pasos en una fila (`min-height:44px` táctil, `ellipsis`, solo el activo en verde, resto blancos) | `.steps-mini`, `.step-mini` |
+| Tarjeta de escaneo reducida (horizontal en pantallas suficientes, vertical limpia bajo `360px`, botón “Escanear” priorizado `56px`) | `.scan-cta`, `.btn-scan` |
+| Iconos: sin set local en `img/` (solo logo + productos), se conservan los emojis actuales; sin librerías ni CDN | — |
+
+---
+
+## 18. 🛒 Catálogo 2 columnas + navegación y TOBI sin superposición (solo `styles.css`)
+
+| Cambio | Dónde |
+|--------|-------|
+| 14 productos intactos; 2 columnas `repeat(2,minmax(0,1fr))` entre 320–430px; tarjetas igualadas (`height:100%`, botón con `margin-top:auto/min-height:44px`); imagen `contain 120px`; hover solo en `@media (hover:hover)` | `.product-grid`, `.product`, `.product-img`, `.add-btn` |
+| Navegación fija inferior de ancho completo (`bottom:0`, fondo blanco, borde superior gris, sombra superior suave, botones `48px`) con las 5 opciones; solo la activa resaltada | `.bottom-nav` |
+| Espacio inferior `body padding-bottom:128px` para que la navegación no tape productos ni botones | `body` |
+| TOBI colapsado con “T” (lógica intacta): `right:16px/bottom:96px` en móvil sobre la navegación; `32px/32px` esquina inferior derecha en escritorio | `.bot-widget` |
+
+---
+
+## 19. 👋 Bienvenida comercial + logotipo sin caja blanca
+
+| Cambio | Dónde |
+|--------|-------|
+| Hero compacta `max-width:520px` (padding `20px` móvil / `24px` escritorio, radio `22px`, fondo sólido `#40a629`, círculos sutiles, sin degradados intensos ni emojis grandes) | `.login-hero` |
+| Logotipo: `Logo_Tottus.png` 320×320 con 135 px transparentes arriba/abajo y 0 píxeles blancos (el blanco era CSS) → recorte `Logo_Tottus-cropped.png` (304×66) → variante blanca `Logo_Tottus-blanco.png` (verdes a blanco, amarillos intactos); bienvenida sin fondos/cápsulas (`190px/65vw`, `170px` móvil, `200px` escritorio); cabecera conserva el original | `img/`, `index.html` (solo `src` de bienvenida), `.login-logo` |
+| Formulario de acceso separado `28px` debajo (`max-width:520px`); TOBI sin superposición | `.login-card` |
+
+---
+
+## 20. 🔑 Acceso minimalista por pasos (`index.html` + `styles.css` + `app.js`)
+
+| Cambio | Dónde |
+|--------|-------|
+| Vista inicial: solo bienvenida + 3 botones (`#btnGoLogin` amarillo, `#btnGoRegister` blanco, `#btnDemo` transparente con borde blanco; `52px`, `gap:12px`, `max-width:380px`); eliminados “Comenzar compra” y tarjeta de beneficios | `index.html`, `.hero-auth`, `.hero-btn-*` |
+| Login (`#loginCard`/`#emailLoginForm`): título + texto corto, email + contraseña con etiquetas, toggle 👁️, enlace visual de recuperación, “Ingresar” verde y “Volver” discreto; errores bajo cada campo; tarjeta blanca `max-width:420px` (`20px` móvil / `24px` escritorio) | `index.html`, `.auth-card`, `.field-error` |
+| Registro (`#loginForm` “Crear cuenta”): campos y validaciones RN02 intactos + botón “Volver” (`#btnBackToWelcomeReg`) | `index.html` |
+| Interacción por JS sin hash ni recargas: cada botón muestra solo su formulario en la misma pantalla con foco al primer campo; “Volver” restaura, devuelve el foco y limpia el hash con `history.replaceState`; demo reutiliza el acceso existente; guardia `window._emailLoginBound` (sin listeners duplicados); contraseña nunca en `localStorage`/consola | `app.js` |
+| Corrección inicial: `.auth-card { display:grid }` vencía a `hidden` → reglas `#loginCard[hidden]` / `#loginForm[hidden] { display:none !important }` | `styles.css` |
