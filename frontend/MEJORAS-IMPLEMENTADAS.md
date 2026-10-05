@@ -2,7 +2,7 @@
 
 > Documento de trabajo: segunda iteración del proyecto **Tottus Scan & Go** (Universidad Norbert Wiener – Software 1, Proyecto Integrador).
 > Fecha: septiembre 2026 · Equipo: Arzapalo, Alva, Cabrejos, Condori · Ciclo: IS4M1.
-> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–27 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio y revisión final). Todo el código se genera solo con **Opencode**.
+> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–28 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio, revisión final y visibilidad nav/TOBI solo en dashboard). Todo el código se genera solo con **Opencode**.
 
 Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 
@@ -462,3 +462,17 @@ Correcciones puntuales de acabado; cero cambios de lógica (`app.js` e `index.ht
 | Espaciado y superposiciones verificados sin cambios (TOBI, navegación y tarjetas ya con márgenes anti-solape; bienvenida/login/registro/dashboard verificados punto por punto) | — |
 
 **Verificación:** bienvenida (3 botones), login, registro desde login, Google (aviso), demo, dashboard móvil/escritorio, catálogo (14), escáner, carrito, navegación (5) y TOBI (colapsado “T”) operativos; `git diff --stat`: solo `frontend/styles.css`.
+
+---
+
+## 28. 🙈 Navegación y TOBI solo en el dashboard (estado `access` / `dashboard`)
+
+La barra inferior aparecía en bienvenida/login/registro y TOBI antes de entrar. Causa: `.bottom-nav { display:flex }` vence al atributo `hidden` (los estilos de autor tienen prioridad sobre la hoja UA), así que `bottomNav.hidden = true` nunca la ocultaba; y `#botWidget` no tenía ninguna lógica de ocultamiento. Sin cambios de funciones, diseño, productos, escáner, carrito, pago, validaciones ni TOBI.
+
+| Cambio | Dónde |
+|--------|-------|
+| Estado visual único en `<body>`: `access-mode` / `dashboard-mode`, conmutado solo en `updateAuthUI()` según `logged` (demo, login validado → dashboard; Google sin OAuth no cambia el modo; Salir → acceso) | `app.js` |
+| Estado inicial obligatorio en el HTML: `<body class="access-mode">` (bienvenida + 3 botones, sin flash de dashboard antes del JS) | `index.html` |
+| `body.access-mode #appHeader/#bottomNav/#botWidget { display:none !important }` (fuera del flujo, sin `opacity`) + `body.access-mode { padding-bottom:0 !important }` (sin espacio reservado de la barra fija) | `styles.css` |
+
+**Verificación:** flujo de 20 pasos (recarga → acceso sin nav/TOBI; login/registro/Google mantienen ocultos; demo → dashboard con nav/TOBI; Salir → bienvenida sin nav/TOBI; recarga → modo acceso); `node --check` OK.

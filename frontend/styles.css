@@ -123,6 +123,11 @@ body {
 
 /* Layout */
 .app-main { max-width: 640px; margin: 0 auto; padding: 12px 16px 16px; min-width: 0; }
+/* Estado visual único: acceso vs dashboard (una sola fuente de verdad en <body>) */
+body.access-mode #appHeader,
+body.access-mode #bottomNav,
+body.access-mode #botWidget { display: none !important; }
+body.access-mode { padding-bottom: 0 !important; }
 .card {
   background: var(--white); border-radius: var(--radius); padding: 16px;
   box-shadow: var(--shadow); border: 1px solid var(--border);

@@ -402,6 +402,9 @@ function showView(name) {
 function updateAuthUI() {
   const user = getUser();
   const logged = !!user || demoMode;
+  // Estado visual único: access (bienvenida/login/registro) vs dashboard.
+  document.body.classList.toggle("access-mode", !logged);
+  document.body.classList.toggle("dashboard-mode", logged);
   $("appHeader").hidden = !logged;
   $("bottomNav").hidden = !logged;
   const badge = $("demoBadge");
