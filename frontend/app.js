@@ -973,6 +973,15 @@ function init() {
     $("btnDemo").addEventListener("click", enterDemo);
   }
 
+  // Continuar con Google: OAuth no configurado. Solo aviso, sin acceso ni credenciales.
+  if (!window._googleBound) {
+    window._googleBound = true;
+    const btnGoogle = $("btnGoogle");
+    if (btnGoogle) btnGoogle.addEventListener("click", () => {
+      toast("El acceso con Google estará disponible próximamente");
+    });
+  }
+
   // Login mejorado: ver/ocultar contraseña
   $("btnTogglePass").addEventListener("click", () => {
     const i = $("loginPass");

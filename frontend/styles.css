@@ -135,7 +135,7 @@ body {
 .login-hero {
   position: relative; overflow: hidden; text-align: center;
   background: var(--green);
-  color: #fff; border-radius: 22px; padding: 20px 16px 28px;
+  color: #fff; border-radius: 22px; padding: 20px 16px;
   box-shadow: var(--shadow);
   max-width: 520px; margin: 0 auto; width: 100%;
 }
@@ -184,6 +184,7 @@ body {
 }
 .hero-btn-primary { background: var(--yellow); color: var(--text); border: none; }
 .hero-btn-secondary { background: #fff; color: var(--green-dark); border: none; }
+.hero-btn-google { background: #fff; color: var(--text); border: 1px solid var(--border); }
 .hero-btn-tertiary { background: transparent; color: #fff; border: 1.5px solid #fff; }
 .hero-btn-tertiary:hover { background: rgba(255,255,255,.12); }
 .hero-btn-tertiary:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
