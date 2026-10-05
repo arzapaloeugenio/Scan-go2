@@ -681,6 +681,192 @@ body.access-mode { padding-bottom: 0 !important; }
   .hero-steps div { font-size: 12px; padding: 6px 2px; }
   .hero-cta { min-width: 0; width: 100%; }
 }
+/* Acceso móvil 320-767px: pantalla completa verde, sin tarjeta flotante (solo móvil) */
+@media (max-width: 767px) {
+  body.access-mode {
+    background: var(--green);
+    min-height: 100dvh;
+    overflow-x: clip;
+  }
+  body.access-mode .app-main {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: transparent;
+    overflow-x: clip;
+  }
+  body.access-mode #view-login {
+    width: 100%;
+    min-height: 100dvh;
+    margin: 0;
+    padding: 0;
+    background: var(--green);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow-x: clip;
+  }
+  body.access-mode #loginHero {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    min-height: 100dvh;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: stretch;
+    text-align: center;
+    padding: calc(20px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));
+    overflow-x: clip;
+  }
+  body.access-mode .hero-auth {
+    width: 100%;
+    max-width: 380px;
+    margin: 12px auto 0;
+    display: grid;
+    gap: 12px;
+    justify-items: center;
+  }
+  body.access-mode .hero-btn {
+    width: 100%;
+    max-width: 380px;
+    min-height: 52px;
+    margin: 0 auto;
+  }
+  body.access-mode #view-login .auth-card,
+  body.access-mode #view-login .login-card {
+    width: calc(100% - 32px);
+    max-width: 420px;
+    margin: 20px auto;
+    padding: 20px;
+  }
+}
+/* Acceso escritorio 1024px+: dos columnas sin duplicar HTML ni tocar movil/JS */
+@media (min-width: 1024px) {
+  body.access-mode {
+    background: #fff;
+    min-height: 100vh;
+    overflow-x: clip;
+  }
+  body.access-mode #appHeader,
+  body.access-mode #bottomNav,
+  body.access-mode #botWidget { display: none !important; }
+  body.access-mode .app-main {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background: #fff;
+    overflow-x: clip;
+  }
+  body.access-mode #view-login {
+    display: grid;
+    grid-template-columns: 55% 45%;
+    grid-template-rows: auto auto auto auto;
+    align-items: center;
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    position: relative;
+    overflow-x: clip;
+  }
+  /* Panel izquierdo verde corporativo + patrones CSS discretos (sin texto, sin emoji, sin imagen) */
+  body.access-mode #view-login::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 55%;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,.13) 0 3px, transparent 3px 7px, rgba(255,255,255,.06) 7px 8px, transparent 8px 12px) 0 100% / 100% 72px no-repeat,
+      radial-gradient(circle, rgba(255,255,255,.15) 2px, transparent 3px) 0 0 / 24px 24px,
+      radial-gradient(520px 300px at 18% 16%, rgba(255,255,255,.13), transparent 60%),
+      radial-gradient(480px 360px at 82% 88%, rgba(254,235,21,.12), transparent 62%),
+      radial-gradient(420px 320px at 70% 30%, rgba(109,186,77,.35), transparent 65%),
+      linear-gradient(160deg, #40a629 0%, #3f752f 45%, #01855d 75%, #044d29 100%);
+  }
+  /* Marco scanner + esquinas amarillas: representa lectura/salida sin texto */
+  body.access-mode #view-login::after {
+    content: "";
+    position: absolute;
+    left: 27.5%;
+    bottom: 7%;
+    transform: translateX(-50%);
+    width: min(340px, 38vw);
+    height: 190px;
+    z-index: 0;
+    pointer-events: none;
+    border: 2px solid rgba(255,255,255,.45);
+    border-radius: 18px;
+    box-shadow: 0 0 0 12px rgba(255,255,255,.06);
+    background:
+      linear-gradient(#feeb15, #feeb15) left top / 26px 4px no-repeat,
+      linear-gradient(#feeb15, #feeb15) left top / 4px 26px no-repeat,
+      linear-gradient(#feeb15, #feeb15) right top / 26px 4px no-repeat,
+      linear-gradient(#feeb15, #feeb15) right top / 4px 26px no-repeat,
+      linear-gradient(#feeb15, #feeb15) left bottom / 26px 4px no-repeat,
+      linear-gradient(#feeb15, #feeb15) left bottom / 4px 26px no-repeat,
+      linear-gradient(#feeb15, #feeb15) right bottom / 26px 4px no-repeat,
+      linear-gradient(#feeb15, #feeb15) right bottom / 4px 26px no-repeat;
+  }
+  /* La hero se disuelve como caja y sus hijos pasan a ser items del grid (no se duplica HTML) */
+  body.access-mode #view-login #loginHero { display: contents; }
+  body.access-mode #view-login #loginHero[hidden] { display: contents !important; }
+  /* Izquierda corporativa: logo + titulo + texto + beneficios */
+  body.access-mode #view-login .login-logo { grid-column: 1; grid-row: 1; z-index: 1; justify-self: center; margin: 48px 0 0; }
+  body.access-mode #view-login #loginHero h1 { grid-column: 1; grid-row: 2; z-index: 1; justify-self: center; color: #fff; font-size: clamp(32px, 3.4vw, 44px); line-height: 1.1; margin: 14px 0 0; max-width: 480px; text-align: center; }
+  body.access-mode #view-login .hero-desc { grid-column: 1; grid-row: 3; z-index: 1; justify-self: center; color: rgba(255,255,255,.93); max-width: 44ch; text-align: center; font-size: 15px; }
+  body.access-mode #view-login .hero-steps { grid-column: 1; grid-row: 4; z-index: 1; justify-self: center; width: 100%; max-width: 480px; margin: 16px 24px 110px; }
+  /* En login/registro la JS oculta h1/desc/steps: se re-muestran solo a la izquierda en escritorio */
+  body.access-mode #view-login:has(#loginCard:not([hidden])) #loginHero h1[hidden],
+  body.access-mode #view-login:has(#loginForm:not([hidden])) #loginHero h1[hidden] { display: block !important; }
+  body.access-mode #view-login:has(#loginCard:not([hidden])) .hero-desc[hidden],
+  body.access-mode #view-login:has(#loginForm:not([hidden])) .hero-desc[hidden] { display: block !important; }
+  body.access-mode #view-login:has(#loginCard:not([hidden])) .hero-steps[hidden],
+  body.access-mode #view-login:has(#loginForm:not([hidden])) .hero-steps[hidden] { display: flex !important; }
+  /* Derecha: bienvenida / login / registro (la bienvenida no repite beneficios) */
+  body.access-mode #view-login .login-pill { grid-column: 2; grid-row: 1; z-index: 1; justify-self: center; margin: 48px 0 0; }
+  body.access-mode #view-login .hero-auth {
+    grid-column: 2; grid-row: 2 / span 3;
+    z-index: 1; justify-self: center; align-self: center;
+    width: 100%; max-width: 420px;
+    display: grid; gap: 12px; justify-items: stretch;
+    margin: 16px 24px 48px; padding: 0;
+  }
+  body.access-mode #view-login .hero-btn { width: 100%; max-width: 420px; min-height: 52px; margin: 0 auto; }
+  body.access-mode #view-login #btnDemo {
+    background: #40a629;
+    color: #fff;
+    border: 1.5px solid #3f752f;
+  }
+  body.access-mode #view-login #btnDemo:hover { filter: brightness(1.05); }
+  body.access-mode #view-login #btnDemo:active { filter: brightness(.97); }
+  body.access-mode #view-login #btnDemo:focus-visible { outline: 2px solid var(--green-dark); outline-offset: 2px; }
+  body.access-mode #view-login .auth-card,
+  body.access-mode #view-login .login-card {
+    grid-column: 2; grid-row: 1 / span 4;
+    z-index: 1; justify-self: center; align-self: center;
+    width: 100%; max-width: 420px;
+    margin: 32px 24px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+  }
+}
+@media (min-width: 1440px) {
+  body.access-mode #view-login { max-width: 1400px; margin: 0 auto; }
+}
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }

@@ -476,3 +476,53 @@ La barra inferior aparecía en bienvenida/login/registro y TOBI antes de entrar.
 | `body.access-mode #appHeader/#bottomNav/#botWidget { display:none !important }` (fuera del flujo, sin `opacity`) + `body.access-mode { padding-bottom:0 !important }` (sin espacio reservado de la barra fija) | `styles.css` |
 
 **Verificación:** flujo de 20 pasos (recarga → acceso sin nav/TOBI; login/registro/Google mantienen ocultos; demo → dashboard con nav/TOBI; Salir → bienvenida sin nav/TOBI; recarga → modo acceso); `node --check` OK.
+
+---
+
+## 29. 📱 Acceso móvil a pantalla completa 320–767px (solo `styles.css`)
+
+Sin tocar escritorio, HTML, lógica ni validaciones. El acceso parecía una tarjeta pequeña flotando sobre página vacía con zona blanca debajo.
+
+| Cambio | Dónde |
+|--------|-------|
+| Contenedor a pantalla completa: `body.access-mode`, `.app-main`, `#view-login` y `#loginHero` con `width: 100%` y `min-height: 100dvh`, sin altura fija | `@media (max-width: 767px)` |
+| Verde Tottus continuo: `background: var(--green)` en `body.access-mode` y `#view-login`, `background: transparent` en `.app-main`; sin radio/sombra/borde en `#loginHero` | `@media (max-width: 767px)` |
+| Sin tarjeta flotante ni blancos: márgenes exteriores a 0, `padding` seguro `calc(20px + safe-area)` arriba/abajo y `20px` laterales, contenido en columna flex centrada, scroll vertical solo si el contenido supera `100dvh` | `@media (max-width: 767px)` |
+| Botones intactos en mismo contenedor: `.hero-auth` `100% / max 380px / gap 12px` centrado, `.hero-btn` `100% / max 380px / min 52px` | `@media (max-width: 767px)` |
+| Formularios sobre el mismo fondo verde: `.auth-card/.login-card` `calc(100% - 32px) / max 420px / margin 20px auto`, bienvenida oculta por JS existente, scroll natural en registro | `@media (max-width: 767px)` |
+| Ocultos sin reserva: se reutiliza `body.access-mode #appHeader/#bottomNav/#botWidget {display:none}` + `padding-bottom: 0`, más `overflow-x: clip` | `styles.css` base + `@media (max-width: 767px)` |
+
+**Verificación:** `320/360/390/430` con verde a pantalla completa, sin zona blanca, sin scroll-x, botones `52px+`, nav/TOBI ocultos, login/registro reemplazan bienvenida, demo operativo. Escritorio intacto.
+
+---
+
+## 30. 💻 Acceso escritorio en dos columnas 1024px+ (solo `styles.css`)
+
+Móvil intacto, mismo HTML y misma lógica. Se reemplaza la tarjeta pequeña centrada por pantalla completa `55% / 45%` sin duplicar formularios.
+
+| Cambio | Dónde |
+|--------|-------|
+| Rejilla escritorio: `#view-login` `display: grid`, `55% / 45%`, `min-height: 100vh`, contenido centrado verticalmente; `1024–1366px` equilibrado y `≥1440px` con `max-width: 1400px` centrado | `@media (min-width: 1024px)` + `@media (min-width: 1440px)` |
+| Panel izquierdo verde `55%` con `#view-login::before` (base `160deg #40a629→#3f752f→#01855d→#044d29`) y `#view-login::after` como marco scanner con esquinas amarillas | `@media (min-width: 1024px)` |
+| Patrones solo CSS, discretos, sin texto/emojis/fotos/CDN: puntos circulares del logo (`radial 24px`), hojas/frescos (radiales blancos/amarillos suaves), código de barras (`repeating-linear 72px` abajo), marco de lectura (`::after`) y líneas suaves del recorrido (radiales amplios) | `@media (min-width: 1024px)` |
+| Sin duplicar HTML: `#loginHero {display: contents}` (también con `[hidden]`) para que logo/título/descripción/beneficios sean ítems de la columna 1 y `pill/auth/cards` de la columna 2 | `@media (min-width: 1024px)` |
+| Derecha `45%`: bienvenida con `pill + auth` (`100% / max 420px / min 52px / gap 12px` centrados, sin repetir beneficios); login/registro con `.auth-card/.login-card` `max 420px`, `max-height: calc(100vh - 64px)` y scroll solo en panel derecho | `@media (min-width: 1024px)` |
+| Login/registro conservan la izquierda: `:has(#loginCard:not([hidden]))` y `:has(#loginForm:not([hidden]))` re-muestran `h1/desc/steps` ocultos por JS solo en escritorio; `pill/auth` siguen ocultos y no hay formulario bajo la bienvenida | `@media (min-width: 1024px)` |
+| Dashboard/nav/TOBI ocultos sin reserva mediante `body.access-mode` existente; Google conserva aviso sin acceso falso; `overflow-x: clip`, sin scroll horizontal | `styles.css` base + `@media (min-width: 1024px)` |
+
+**Verificación:** `1024/1280/1366/1440` a pantalla completa, corporativo a la izquierda y acceso a la derecha, sin blancos grandes, login/registro reemplazan solo la derecha, nav/TOBI ocultos, móvil intacto. Solo `frontend/styles.css`.
+
+---
+
+## 31. 🟢 Corrección de contraste de “Probar demo” en escritorio (solo `styles.css`)
+
+En móvil se veían los 3 botones; en escritorio el tercero parecía desaparecer. El botón seguía en el HTML y funcionaba, era invisible.
+
+| Cambio | Dónde |
+|--------|-------|
+| Causa: `.hero-btn-tertiary {background: transparent; color: #fff; border: 1.5px solid #fff}` diseñado para fondo verde; al pasar `.hero-auth` al panel derecho blanco en escritorio quedó blanco sobre blanco | `styles.css:193` + `@media (min-width: 1024px)` |
+| Corrección mínima solo escritorio: `body.access-mode #view-login #btnDemo {background: #40a629; color: #fff; border: 1.5px solid #3f752f}` con `hover/active` por `brightness` y `focus-visible` verde oscuro, mismas esquinas/altura | `@media (min-width: 1024px)` |
+| Sin duplicados: un único `#btnDemo` en `index.html:52` dentro de `.hero-auth` y un único listener `btnDemo → enterDemo()` con guarda `_demoBound` | `index.html`, `app.js:976` |
+| Comportamiento intacto: `enterDemo()` reutilizada, directo al dashboard sin login/registro/cuenta/credenciales; visible solo en bienvenida y oculto con login/registro/dashboard por `.hero-auth[hidden]` existente; `Volver/Salir` lo recuperan | `app.js` |
+
+**Verificación:** bienvenida con exactamente 3 botones alineados a `100% / max 420px / min 52px / gap 12px` sin salirse del panel; demo abre dashboard con nav/TOBI; `Salir` recupera los 3; móvil intacto; sin scroll-x ni errores.
