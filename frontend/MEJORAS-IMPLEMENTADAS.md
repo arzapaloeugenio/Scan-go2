@@ -2,7 +2,7 @@
 
 > Documento de trabajo: segunda iteración del proyecto **Tottus Scan & Go** (Universidad Norbert Wiener – Software 1, Proyecto Integrador).
 > Fecha: septiembre 2026 · Equipo: Arzapalo, Alva, Cabrejos, Condori · Ciclo: IS4M1.
-> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. Todo el código se genera solo con **Opencode**.
+> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–27 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio y revisión final). Todo el código se genera solo con **Opencode**.
 
 Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 
@@ -416,3 +416,49 @@ Solo diseño. Login, registro y “Probar demo” funcionan igual; sin cambios d
 | `320-430px`: tarjetas con `padding:16px` y margen inferior amplio; campos/botones `>=48px`; sin scroll horizontal | `styles.css` (`@media max-width:430px`) |
 
 **Verificación:** ningún formulario visible al cargar; sin `#loginForm/#registerForm` en URL; campos y botones `>=48px`; `320-430px` sin solapes; login, registro y demo siguen operativos. `git diff --stat`: solo `frontend/styles.css`.
+
+---
+
+## 25. 🔑 Bienvenida con tres botones: Iniciar sesión / Continuar con Google / Probar demo
+
+Sin “Crear cuenta” independiente en la bienvenida. Lógica de login, registro, demo, validaciones y TOBI intacta.
+
+| Cambio | Dónde |
+|--------|-------|
+| Botón `#btnGoRegister` (“Crear cuenta”) eliminado de `.hero-auth`; nuevo `#btnGoogle` (“Continuar con Google”, texto exacto) entre “Iniciar sesión” y “Probar demo”: bienvenida con exactamente 3 botones | `index.html` |
+| Texto del login ajustado a “¿No tienes una cuenta? Crear cuenta”; “Crear cuenta” vive solo dentro del login (`#btnGoRegisterFromLogin → showRegister`, sin hashes ni recarga) | `index.html` |
+| `.hero-btn-google`: fondo blanco, texto oscuro, borde gris suave, hereda `min-height:52px` y ancho completo de `.hero-btn`; sin icono (no existe set local en `img/`, sin descargas ni CDN) | `styles.css` |
+| `.login-hero` con `padding:20px 16px` para ajustar la tarjeta verde al contenido sin altura fija | `styles.css` |
+| `#btnGoogle` con guarda `window._googleBound` (sin listeners duplicados): solo `toast("El acceso con Google estará disponible próximamente")`, sin pedir contraseña, sin simular auth, sin acceso al dashboard | `app.js` |
+| `demo` reutiliza `enterDemo()` existente (directo al dashboard, sin cuenta ni credenciales); referencias a `$("btnGoRegister")` ya protegidas con `if`, sin roturas | `app.js` |
+
+**Verificación:** recarga → 3 botones; “Iniciar sesión” → solo login; “Crear cuenta” (dentro del login) → solo registro; “Volver” → bienvenida; Google → aviso sin acceso; demo → dashboard; navegación oculta durante el acceso; `node --check` OK.
+
+---
+
+## 26. 📱💻 Dashboard móvil compacto + escritorio centrado (solo `styles.css`)
+
+Mismo HTML, catálogo (14 productos), carrito, escáner y JavaScript. Sin duplicar nada; móvil/tablet no se tocan entre sí (cada cambio vive en su propio `media query`).
+
+| Cambio | Dónde |
+|--------|-------|
+| Móvil `320–430px`: cabecera `6px 12px`, logo `110px`, saludo `11px`, carrito `44px`; buscador `min-height:48px` con “Todo/Ofertas” en `44px` dentro del ancho; promo `8px 10px`; 4 pasos en `9px/40px`; escáner `10px`; catálogo 2 columnas `gap:8px`, imagen `110px`; nav fina con botones `44px`; TOBI `bottom:108px/right:12px` | `@media (max-width:430px)` |
+| Escritorio `≥1024px`: contenedor `max-width:1100px` centrado; cabecera compacta con logo `130px` y carrito `44px` visible; catálogo **4 columnas** `gap:16px`, imagen `130px`; promo/pasos/escáner compactos en fila; misma navegación de 5 opciones como barra `1100px` (sin duplicar); TOBI `32px/32px` | `@media (min-width:1024px)` |
+| Hover discreto solo en compatibles (`translateY(-2px)` tarjetas, `brightness` en botones); `focus-visible` global existente; sin animaciones nuevas | `@media (min-width:1024px) and (hover:hover)` |
+
+**Verificación:** `320/360/390/430` → 2 columnas, sin scroll-x, filtros y pasos en pantalla, nav/TOBI sin cubrir; `1024/1280/1366/1440` → 4 columnas, centrado, sin tarjetas gigantes; escáner, carrito y pago funcionando.
+
+---
+
+## 27. 🔍 Revisión final sin funciones nuevas (solo `styles.css`)
+
+Correcciones puntuales de acabado; cero cambios de lógica (`app.js` e `index.html` intactos, `node --check` OK).
+
+| Cambio | Dónde |
+|--------|-------|
+| Botones `<44px`: `.icon-btn` base `40px → 44px`; `.codes-list button` con `min-height:44px`; `−/+` del carrito y `✕` de TOBI con área táctil de 44px vía `::after` (`inset:-6px` / `-12px`) sin alterar su tamaño visual ni el layout | `styles.css` |
+| Desbordes: `overflow-wrap:anywhere` en `.product-brand`, `.product-code` (EAN largo en tarjetas de ~140px) y `.cart-info` | `styles.css` |
+| Contraste/legibilidad: `.bot-name` `9px → 10px` (blanco sobre verde profundo) | `styles.css` |
+| Espaciado y superposiciones verificados sin cambios (TOBI, navegación y tarjetas ya con márgenes anti-solape; bienvenida/login/registro/dashboard verificados punto por punto) | — |
+
+**Verificación:** bienvenida (3 botones), login, registro desde login, Google (aviso), demo, dashboard móvil/escritorio, catálogo (14), escáner, carrito, navegación (5) y TOBI (colapsado “T”) operativos; `git diff --stat`: solo `frontend/styles.css`.
