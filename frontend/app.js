@@ -1004,14 +1004,21 @@ function init() {
         const el = document.querySelector("#view-login " + s);
         if (el) el.hidden = hidden;
       });
+      const hero = $("loginHero");
+      if (hero) {
+        hero.hidden = hidden;
+        hero.setAttribute("aria-hidden", String(hidden));
+      }
     }
     function showEmailLogin(opener) {
       lastOpener = opener || null;
       setIntroHidden(true);
       const reg = $("loginForm");
-      if (reg) reg.hidden = true;
+      if (reg) { reg.hidden = true; reg.setAttribute("aria-hidden", "true"); }
       const card = $("loginCard");
-      if (card) card.hidden = false;
+      if (card) { card.hidden = false; card.setAttribute("aria-hidden", "false"); }
+      if ($("btnGoLogin")) $("btnGoLogin").setAttribute("aria-expanded", "true");
+      if ($("btnGoRegister")) $("btnGoRegister").setAttribute("aria-expanded", "false");
       const mail = $("authEmail");
       if (mail) setTimeout(() => mail.focus({ preventScroll: false }), 50);
     }
@@ -1019,19 +1026,23 @@ function init() {
       lastOpener = opener || null;
       setIntroHidden(true);
       const card = $("loginCard");
-      if (card) card.hidden = true;
+      if (card) { card.hidden = true; card.setAttribute("aria-hidden", "true"); }
       const reg = $("loginForm");
-      if (reg) reg.hidden = false;
+      if (reg) { reg.hidden = false; reg.setAttribute("aria-hidden", "false"); }
+      if ($("btnGoLogin")) $("btnGoLogin").setAttribute("aria-expanded", "false");
+      if ($("btnGoRegister")) $("btnGoRegister").setAttribute("aria-expanded", "true");
       clearRegisterErrors();
       const name = $("loginName");
       if (name) setTimeout(() => name.focus({ preventScroll: false }), 50);
     }
     function showWelcome() {
       const card = $("loginCard");
-      if (card) card.hidden = true;
+      if (card) { card.hidden = true; card.setAttribute("aria-hidden", "true"); }
       const reg = $("loginForm");
-      if (reg) reg.hidden = true;
+      if (reg) { reg.hidden = true; reg.setAttribute("aria-hidden", "true"); }
       setIntroHidden(false);
+      if ($("btnGoLogin")) $("btnGoLogin").setAttribute("aria-expanded", "false");
+      if ($("btnGoRegister")) $("btnGoRegister").setAttribute("aria-expanded", "false");
       if (/^#(loginForm|registerForm|loginCard)$/.test(location.hash || "")) {
         history.replaceState(null, "", location.pathname + location.search);
       }
@@ -1067,6 +1078,8 @@ function init() {
     });
     const btnSwitchToLogin = $("btnGoLoginFromRegister");
     if (btnSwitchToLogin) btnSwitchToLogin.addEventListener("click", () => showEmailLogin(btnSwitchToLogin));
+    const btnSwitchToRegister = $("btnGoRegisterFromLogin");
+    if (btnSwitchToRegister) btnSwitchToRegister.addEventListener("click", () => showRegister(btnSwitchToRegister));
     const btnForgot = $("btnForgotPass");
     if (btnForgot) btnForgot.addEventListener("click", () => toast("Recuperación no disponible en la demo"));
     const btnToggleAuth = $("btnToggleAuthPass");

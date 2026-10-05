@@ -380,3 +380,20 @@ Sin reconstruir acceso. Login, registro, validaciones, 14 productos, lector, car
 | Botón terciario intacto + estados discretos `hover/focus-visible/active` sin animaciones; etiqueta `#demoBadge` blanca discreta con `hidden` inicial | `styles.css`, `index.html` |
 
 **Verificación:** `node --check app.js` OK; 3 botones iniciales; demo abre dashboard sin formularios con `Modo demo`; catálogo/escáner/carrito operativos; `Salir` regresa a bienvenida con formularios ocultos; reingreso sin eventos/productos duplicados; sin errores de consola.
+
+---
+
+## 23. ✨ Pulido final de acceso (un solo estado, sin nuevas funciones)
+
+Sin reconstruir acceso ni añadir funciones/listeners duplicados. Dashboard, productos, lector, carrito, pago y TOBI intactos.
+
+| Cambio | Dónde |
+|--------|-------|
+| Estados únicos `loginHero` / `loginCard` / `loginForm`; hero con `id` y `hidden` real (`display:none`, no solo `visibility`); inicial solo bienvenida; limpieza de `#loginForm/#registerForm` sin hashes | `index.html`, `styles.css`, `app.js` (`setIntroHidden/showWelcome`) |
+| Transición breve `fadeSlide .22s` (opacidad + vertical suave) en `.view/.auth-card/.login-card`; `prefers-reduced-motion` la anula con cambio inmediato | `styles.css` |
+| Unificación: `--muted:#607069`, gaps `12/16px`, radios `12/14/16px`, campos y botones `min-height:48px`, forms `420px`, hero `520px`, `:focus-visible` verde oscuro, `auth-switch` también en login | `styles.css` |
+| Accesibilidad: `aria-expanded/aria-controls` en Iniciar/Crear, `aria-hidden` sincronizado en hero/cards, `aria-live` en 9 errores/confirmación, `label for`, `autocomplete email/current-password/new-password`, `inputmode numeric`, foco a correo/nombre y retorno a su botón, sin autofocus inicial | `index.html`, `app.js` |
+| Enlace faltante `¿No tienes cuenta? Crear cuenta` (`#btnGoRegisterFromLogin → showRegister`); el inverso ya existía; foco y una sola tarjeta por vez conservados | `index.html`, `app.js` |
+| Seguridad re-verificada: sin contraseñas en `localStorage`/`sessionStorage`/consola/URL; registro demo sin cuenta real; demo en memoria sin credenciales | `app.js` |
+
+**Verificación:** `node --check` OK; flujos 1–5 (login, registro, enlaces, demo, recarga sin forms/hash/errores); 320–1366 sin scroll horizontal ni superposición TOBI/navegación.

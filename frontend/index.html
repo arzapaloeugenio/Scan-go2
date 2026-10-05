@@ -35,7 +35,7 @@
   <main class="app-main">
     <!-- VISTA: LOGIN -->
     <section id="view-login" class="view">
-      <div class="login-hero">
+      <div class="login-hero" id="loginHero">
         <div class="hero-bubbles" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
         <div class="login-logo"><img src="img/Logo_Tottus-blanco.png" class="main-logo" alt="Tottus" /></div>
         <div class="login-pill">SCAN &amp; GO · DEMO</div>
@@ -47,36 +47,37 @@
           <div>🛡️<b>Valida y sal</b></div>
         </div>
         <div class="hero-auth">
-          <button type="button" class="hero-btn hero-btn-primary" id="btnGoLogin">Iniciar sesión</button>
-          <button type="button" class="hero-btn hero-btn-secondary" id="btnGoRegister">Crear cuenta</button>
+          <button type="button" class="hero-btn hero-btn-primary" id="btnGoLogin" aria-expanded="false" aria-controls="loginCard">Iniciar sesión</button>
+          <button type="button" class="hero-btn hero-btn-secondary" id="btnGoRegister" aria-expanded="false" aria-controls="loginForm">Crear cuenta</button>
           <button type="button" class="hero-btn hero-btn-tertiary" id="btnDemo">Probar demo</button>
         </div>
       </div>
-      <div id="loginCard" class="card auth-card" hidden>
+      <div id="loginCard" class="card auth-card" hidden aria-hidden="true">
         <h2>Iniciar sesión</h2>
         <p class="muted small">Ingresa para continuar con Scan &amp; Go</p>
         <form id="emailLoginForm" novalidate>
-          <label>
+          <label for="authEmail">
             Correo electrónico
             <input type="email" id="authEmail" placeholder="tucorreo@mail.com" required autocomplete="email" />
           </label>
-          <p class="field-error" id="authEmailError" hidden></p>
-          <label>
+          <p class="field-error" id="authEmailError" hidden aria-live="polite"></p>
+          <label for="authPass">
             Contraseña
             <span class="pass-wrap">
               <input type="password" id="authPass" placeholder="Tu contraseña" required autocomplete="current-password" />
               <button type="button" class="pass-toggle" id="btnToggleAuthPass" aria-label="Ver contraseña">👁️</button>
             </span>
           </label>
-          <p class="field-error" id="authPassError" hidden></p>
+          <p class="field-error" id="authPassError" hidden aria-live="polite"></p>
           <div class="auth-links">
             <button type="button" class="link-btn" id="btnForgotPass">¿Olvidaste tu contraseña?</button>
           </div>
           <button type="submit" class="btn-primary">Ingresar</button>
           <button type="button" class="btn-ghost" id="btnBackToWelcome">Volver</button>
+          <p class="muted small auth-switch">¿No tienes cuenta? <button type="button" class="link-btn" id="btnGoRegisterFromLogin">Crear cuenta</button></p>
         </form>
       </div>
-      <form id="loginForm" class="card login-card" autocomplete="on" hidden novalidate>
+      <form id="loginForm" class="card login-card" autocomplete="on" hidden aria-hidden="true" novalidate>
         <h2>Crear cuenta</h2>
         <p class="muted small">Crea tu cuenta para comprar sin colas</p>
         <label for="loginName">

@@ -12,7 +12,7 @@
   --white: #ffffff;
   --bg: #f5f7f4;
   --text: #263238;
-  --muted: #5a6f65;
+  --muted: #607069;
   --border: #dfe5dd;
   --radius: 16px;
   --shadow: 0 4px 14px rgba(38, 50, 56, 0.08);
@@ -47,8 +47,11 @@ body {
 @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
 @keyframes wiggle { 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
 
-.view { animation: fadeSlide .35s ease; }
+.view { animation: fadeSlide .22s ease; }
 .view[hidden] { display: none !important; }
+#loginHero[hidden] { display: none !important; }
+.auth-card, .login-card { animation: fadeSlide .22s ease; }
+:focus-visible { outline: 2px solid var(--green-dark); outline-offset: 2px; }
 
 /* Header */
 .app-header {
@@ -198,7 +201,7 @@ body {
 .auth-card { max-width: 420px; width: 100%; margin: 16px auto 0; padding: 20px; display: grid; gap: 4px; }
 .auth-card h2 { margin: 0; }
 .auth-card p.muted { margin: 0 0 8px; }
-.auth-card form { display: grid; gap: 10px; }
+.auth-card form { display: grid; gap: 12px; }
 .auth-card label { display: grid; gap: 6px; font-size: 14px; font-weight: 700; color: var(--green-dark); }
 .auth-card input {
   min-height: 48px; padding: 12px 13px; border-radius: 12px; border: 1px solid var(--border);
@@ -211,6 +214,8 @@ body {
 .auth-links { display: flex; justify-content: flex-end; }
 .link-btn { background: none; border: none; padding: 8px 0; min-height: 44px; color: var(--green-deep); font-size: 13px; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .auth-card .btn-ghost { border: 1px solid var(--border); color: var(--text); font-weight: 700; }
+.auth-card .auth-switch { margin: 0; text-align: center; }
+.auth-card .auth-switch .link-btn { display: inline; padding: 8px 4px; vertical-align: baseline; }
 @media (min-width: 768px) {
   .auth-card { padding: 24px; }
 }
@@ -239,6 +244,7 @@ body {
 /* Botones verdes */
 .btn-primary, .btn-dark, .btn-ghost, .btn-small, .btn-scan {
   border: none; cursor: pointer; border-radius: 14px; font-weight: 800;
+  min-height: 48px;
 }
 .btn-primary {
   position: relative; overflow: hidden;
