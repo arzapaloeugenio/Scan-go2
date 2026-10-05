@@ -205,13 +205,19 @@ body {
 @media (min-width: 768px) {
   .auth-card { padding: 24px; }
 }
-.login-card { display: grid; gap: 10px; margin: 28px auto 0; border-top: 3px solid var(--green); max-width: 520px; width: 100%; }
+.login-card { display: grid; gap: 16px; margin: 28px auto 32px; border-top: 3px solid var(--green); max-width: 420px; width: 100%; background: #fff; }
 .login-card label { display: grid; gap: 6px; font-size: 14px; font-weight: 700; color: var(--green-dark); }
 .login-card input {
   padding: 13px; border-radius: 12px; border: 1px solid var(--border);
-  font-size: 15px; width: 100%; background: #fff;
+  font-size: 15px; width: 100%; background: #fff; min-height: 48px;
 }
 .login-card input:focus { border-color: var(--green); outline: none; background: #fff; }
+.login-card input[aria-invalid="true"] { border-color: #b71c1c; }
+.login-card .field-error { margin: 0; }
+.login-card .form-success { margin: 0; font-size: 13px; font-weight: 700; color: var(--green-dark); background: var(--green-soft); border-radius: 10px; padding: 10px 12px; }
+.login-card .form-success[hidden] { display: none; }
+.login-card .auth-switch { margin: 0; text-align: center; }
+.login-card .auth-switch .link-btn { display: inline; padding: 8px 4px; vertical-align: baseline; }
 .demo-divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
 .demo-divider::before, .demo-divider::after { content: ""; flex: 1; height: 2px; background: var(--border); border-radius: 2px; }
 .btn-demo {

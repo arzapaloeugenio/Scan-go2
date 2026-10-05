@@ -121,6 +121,92 @@ function isAdultUser() {
   return age !== null && age >= 18;
 }
 
+// ---------- REGISTRO: validación por campo (sin backend) ----------
+function setRegError(inputId, errorId, msg) {
+  const input = $(inputId);
+  const err = $(errorId);
+  const ok = !msg;
+  if (err) {
+    err.hidden = ok;
+    if (!ok) err.textContent = msg;
+  }
+  if (input) input.setAttribute("aria-invalid", String(!ok));
+  return ok;
+}
+function clearRegisterErrors() {
+  ["loginNameError", "loginEmailError", "loginPassError", "loginPassConfirmError", "loginDNIError", "loginBirthError"].forEach((id) => {
+    const p = $(id);
+    if (p) { p.hidden = true; p.textContent = ""; }
+  });
+  ["loginName", "loginEmail", "loginPass", "loginPassConfirm", "loginDNI", "loginBirth"].forEach((id) => {
+    const i = $(id);
+    if (i) i.removeAttribute("aria-invalid");
+  });
+  const ok = $("registerSuccess");
+  if (ok) { ok.hidden = true; ok.textContent = ""; }
+}
+function validateRegisterField(field) {
+  const val = (id) => ($(id) ? $(id).value : "");
+  if (field === "name" || !field) {
+    const v = (val("loginName") || "").trim();
+    if (!v) return setRegError("loginName", "loginNameError", "Ingresa tu nombre y apellido.");
+    if (v.length < 3) return setRegError("loginName", "loginNameError", "Mínimo 3 caracteres.");
+    setRegError("loginName", "loginNameError", "");
+  }
+  if (field === "email" || !field) {
+    const v = (val("loginEmail") || "").trim();
+    if (!v) return setRegError("loginEmail", "loginEmailError", "Ingresa tu correo electrónico.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return setRegError("loginEmail", "loginEmailError", "Ingresa un correo válido.");
+    setRegError("loginEmail", "loginEmailError", "");
+  }
+  if (field === "pass" || !field) {
+    const v = val("loginPass") || "";
+    if (!v) return setRegError("loginPass", "loginPassError", "Ingresa una contraseña.");
+    if (v.length < 4) return setRegError("loginPass", "loginPassError", "Mínimo 4 caracteres.");
+    setRegError("loginPass", "loginPassError", "");
+  }
+  if (field === "confirm" || !field) {
+    const p = val("loginPassConfirm") || "";
+    const o = val("loginPass") || "";
+    if (!p) return setRegError("loginPassConfirm", "loginPassConfirmError", "Confirma tu contraseña.");
+    if (p !== o) return setRegError("loginPassConfirm", "loginPassConfirmError", "Las contraseñas no coinciden.");
+    setRegError("loginPassConfirm", "loginPassConfirmError", "");
+  }
+  if (field === "dni" || !field) {
+    const v = (val("loginDNI") || "").trim();
+    if (!v) return setRegError("loginDNI", "loginDNIError", "Ingresa tu DNI.");
+    if (!/^\d{8}$/.test(v)) return setRegError("loginDNI", "loginDNIError", "El DNI debe tener exactamente 8 números.");
+    setRegError("loginDNI", "loginDNIError", "");
+  }
+  if (field === "birth" || !field) {
+    const v = val("loginBirth") || "";
+    if (!v) return setRegError("loginBirth", "loginBirthError", "Ingresa tu fecha de nacimiento.");
+    const d = new Date(v + "T00:00:00");
+    if (isNaN(d)) return setRegError("loginBirth", "loginBirthError", "Fecha no válida.");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (d > today) return setRegError("loginBirth", "loginBirthError", "No puede ser una fecha futura.");
+    setRegError("loginBirth", "loginBirthError", "");
+  }
+  return true;
+}
+function validateRegisterAll() {
+  const order = ["name", "email", "pass", "confirm", "dni", "birth"];
+  let firstBad = null;
+  let allOk = true;
+  order.forEach((f) => {
+    const ok = validateRegisterField(f);
+    if (!ok && allOk) {
+      allOk = false;
+      const map = { name: "loginName", email: "loginEmail", pass: "loginPass", confirm: "loginPassConfirm", dni: "loginDNI", birth: "loginBirth" };
+      firstBad = map[f];
+    }
+  });
+  // Recomprueba confirmación si la original cambió (doble verificación explícita).
+  if (allOk) validateRegisterField("confirm");
+  return { ok: allOk, firstBad };
+}
+
 function toast(msg) {
   const t = $("toast");
   t.textContent = msg;
@@ -818,23 +904,47 @@ function init() {
     navigator.serviceWorker.register("sw.js").catch(() => { /* offline opcional */ });
   }
 
-  $("loginForm").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const name = $("loginName").value.trim();
-    const email = $("loginEmail").value.trim();
-    const pass = $("loginPass").value;
-    const dni = $("loginDNI").value.trim();
-    const birth = $("loginBirth").value;
-    if (name.length < 3 || !email || pass.length < 4) { toast("Completa todos los campos"); return; }
-    if (!/^\d{8}$/.test(dni)) { toast("⚠️ DNI debe tener 8 dígitos"); return; }
-    const age = calcAge(birth);
-    if (age === null) { toast("⚠️ Ingresa tu fecha de nacimiento"); return; }
-    const isAdult = age >= 18;
-    localStorage.setItem("tottus_user", JSON.stringify({ name, email, dni, birth, age, isAdult }));
-    updateAuthUI();
-    toast(isAdult ? "👋 Bienvenido/a, " + name.split(" ")[0] : "👋 Hola " + name.split(" ")[0] + " (menor: licores bloqueados 🔞)");
-    botSay(isAdult ? `👋 <b>¡Hola, ${name.split(" ")[0]}!</b> Soy <b>Tobi</b>, tu guía de Tottus Scan &amp; Go 🤖. Paso 1: escanea productos con 📷 <b>Escanear</b>. Paso 2: paga desde tu celular. Paso 3: valida en caja y salida. ¡Sin colas!` : `👋 <b>¡Hola, ${name.split(" ")[0]}!</b> Eres menor de edad: los licores (+18) están bloqueados por RN02 🔞. Puedes comprar todo lo demás 💚`);
-  });
+  if (!window._registerBound) {
+    window._registerBound = true;
+    $("loginForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      // NOTA TÉCNICA: sin backend no se crea una cuenta real; el registro real
+      // requiere servidor + almacenamiento seguro (hash de contraseña, nunca en localStorage).
+      const { ok, firstBad } = validateRegisterAll();
+      if (!ok) {
+        if (firstBad && $(firstBad)) $(firstBad).focus({ preventScroll: false });
+        return;
+      }
+      const success = $("registerSuccess");
+      if (success) {
+        success.textContent = "Registro de demostración completado. Se requiere un servidor para crear una cuenta real.";
+        success.hidden = false;
+      }
+      // Seguridad: nunca guardar ni registrar contraseñas.
+      if ($("loginPass")) $("loginPass").value = "";
+      if ($("loginPassConfirm")) $("loginPassConfirm").value = "";
+      toast("Registro de demostración completado. Se requiere un servidor para crear una cuenta real.");
+    });
+    // DNI: solo números, máximo 8 caracteres.
+    const dniInput = $("loginDNI");
+    if (dniInput) dniInput.addEventListener("input", () => {
+      const clean = dniInput.value.replace(/\D/g, "").slice(0, 8);
+      if (dniInput.value !== clean) dniInput.value = clean;
+      if (dniInput.value) validateRegisterField("dni");
+      else setRegError("loginDNI", "loginDNIError", "");
+    });
+    // Limpieza/actualización de errores al corregir + re-chequeo de confirmación.
+    const liveMap = [["loginName", "name"], ["loginEmail", "email"], ["loginPass", "pass"], ["loginPassConfirm", "confirm"], ["loginBirth", "birth"]];
+    liveMap.forEach(([id, field]) => {
+      const el = $(id);
+      if (!el) return;
+      el.addEventListener("input", () => {
+        validateRegisterField(field);
+        if (field === "pass" && $("loginPassConfirm") && $("loginPassConfirm").value) validateRegisterField("confirm");
+      });
+      el.addEventListener("change", () => validateRegisterField(field));
+    });
+  }
 
   // Acceso demo: entra sin escribir nada (ideal para exposición en clase)
   $("btnDemo").addEventListener("click", () => {
@@ -850,6 +960,16 @@ function init() {
     i.type = i.type === "password" ? "text" : "password";
     $("btnTogglePass").textContent = i.type === "password" ? "👁️" : "🙈";
   });
+  if (!window._registerToggleBound) {
+    window._registerToggleBound = true;
+    const btnToggleConfirm = $("btnTogglePassConfirm");
+    if (btnToggleConfirm) btnToggleConfirm.addEventListener("click", () => {
+      const i = $("loginPassConfirm");
+      if (!i) return;
+      i.type = i.type === "password" ? "text" : "password";
+      btnToggleConfirm.textContent = i.type === "password" ? "👁️" : "🙈";
+    });
+  }
 
   // Acceso minimalista: botones reales abren cada formulario por JavaScript (sin hash)
   if (!window._emailLoginBound) {
@@ -883,6 +1003,7 @@ function init() {
       if (card) card.hidden = true;
       const reg = $("loginForm");
       if (reg) reg.hidden = false;
+      clearRegisterErrors();
       const name = $("loginName");
       if (name) setTimeout(() => name.focus({ preventScroll: false }), 50);
     }
@@ -897,12 +1018,16 @@ function init() {
       }
       ["authEmailError", "authPassError"].forEach((id) => {
         const p = $(id);
-        if (p) p.hidden = true;
+        if (p) { p.hidden = true; p.textContent = ""; }
       });
       ["authEmail", "authPass"].forEach((id) => {
         const i = $(id);
         if (i) i.removeAttribute("aria-invalid");
       });
+      // Limpieza del registro al volver a la bienvenida: sin recarga ni cambio de URL.
+      clearRegisterErrors();
+      if ($("loginPass")) $("loginPass").value = "";
+      if ($("loginPassConfirm")) $("loginPassConfirm").value = "";
       const hero = document.querySelector("#view-login .login-hero");
       if (hero) hero.scrollIntoView({ block: "start" });
       if (lastOpener) lastOpener.focus({ preventScroll: true });
@@ -915,7 +1040,13 @@ function init() {
     const btnBack = $("btnBackToWelcome");
     if (btnBack) btnBack.addEventListener("click", showWelcome);
     const btnBackReg = $("btnBackToWelcomeReg");
-    if (btnBackReg) btnBackReg.addEventListener("click", showWelcome);
+    if (btnBackReg) btnBackReg.addEventListener("click", () => {
+      showWelcome();
+      const opener = $("btnGoRegister");
+      if (opener) opener.focus({ preventScroll: true });
+    });
+    const btnSwitchToLogin = $("btnGoLoginFromRegister");
+    if (btnSwitchToLogin) btnSwitchToLogin.addEventListener("click", () => showEmailLogin(btnSwitchToLogin));
     const btnForgot = $("btnForgotPass");
     if (btnForgot) btnForgot.addEventListener("click", () => toast("Recuperación no disponible en la demo"));
     const btnToggleAuth = $("btnToggleAuthPass");

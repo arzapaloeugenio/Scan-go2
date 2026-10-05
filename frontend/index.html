@@ -75,35 +75,50 @@
           <button type="button" class="btn-ghost" id="btnBackToWelcome">Volver</button>
         </form>
       </div>
-      <form id="loginForm" class="card login-card" autocomplete="on" hidden>
+      <form id="loginForm" class="card login-card" autocomplete="on" hidden novalidate>
         <h2>Crear cuenta</h2>
         <p class="muted small">Crea tu cuenta para comprar sin colas</p>
-        <label>
+        <label for="loginName">
           Nombre y apellido
-          <input type="text" id="loginName" placeholder="Ej: María Quispe" required minlength="3" />
+          <input type="text" id="loginName" placeholder="Ej: María Quispe" required minlength="3" autocomplete="name" />
         </label>
-        <label>
+        <p class="field-error" id="loginNameError" hidden aria-live="polite"></p>
+        <label for="loginEmail">
           Correo electrónico
-          <input type="email" id="loginEmail" placeholder="tucorreo@mail.com" required />
+          <input type="email" id="loginEmail" placeholder="tucorreo@mail.com" required autocomplete="email" />
         </label>
-        <label>
+        <p class="field-error" id="loginEmailError" hidden aria-live="polite"></p>
+        <label for="loginPass">
           Contraseña
           <span class="pass-wrap">
-            <input type="password" id="loginPass" placeholder="••••••••" required minlength="4" />
+            <input type="password" id="loginPass" placeholder="••••••••" required minlength="4" autocomplete="new-password" />
             <button type="button" class="pass-toggle" id="btnTogglePass" aria-label="Ver contraseña">👁️</button>
           </span>
         </label>
-        <label>
+        <p class="field-error" id="loginPassError" hidden aria-live="polite"></p>
+        <label for="loginPassConfirm">
+          Confirmar contraseña
+          <span class="pass-wrap">
+            <input type="password" id="loginPassConfirm" placeholder="••••••••" required minlength="4" autocomplete="new-password" />
+            <button type="button" class="pass-toggle" id="btnTogglePassConfirm" aria-label="Ver confirmación de contraseña">👁️</button>
+          </span>
+        </label>
+        <p class="field-error" id="loginPassConfirmError" hidden aria-live="polite"></p>
+        <label for="loginDNI">
           DNI (8 dígitos)
-          <input type="text" id="loginDNI" placeholder="Ej: 12345678" required inputmode="numeric" maxlength="8" pattern="\d{8}" />
+          <input type="text" id="loginDNI" placeholder="Ej: 12345678" required inputmode="numeric" maxlength="8" pattern="\d{8}" autocomplete="off" />
         </label>
-        <label>
+        <p class="field-error" id="loginDNIError" hidden aria-live="polite"></p>
+        <label for="loginBirth">
           Fecha de nacimiento
-          <input type="date" id="loginBirth" required />
+          <input type="date" id="loginBirth" required autocomplete="bday" />
         </label>
+        <p class="field-error" id="loginBirthError" hidden aria-live="polite"></p>
         <p class="muted small">🔞 RN02: licores solo +18 años. Se valida con tu fecha de nacimiento.</p>
-        <button type="submit" class="btn-primary">Crear mi cuenta →</button>
+        <p class="form-success" id="registerSuccess" hidden aria-live="polite"></p>
+        <button type="submit" class="btn-primary">Crear cuenta</button>
         <button type="button" class="btn-ghost" id="btnBackToWelcomeReg">Volver</button>
+        <p class="muted small auth-switch">¿Ya tienes una cuenta? <button type="button" class="link-btn" id="btnGoLoginFromRegister">Iniciar sesión</button></p>
       </form>
     </section>
 
