@@ -37,6 +37,8 @@ let cart = {}; // code -> qty
 let currentFilter = "all";
 let searchTerm = "";
 let scannerRunning = false;
+// Sesión visual de demostración: solo memoria, sin cuenta ni credenciales.
+let demoMode = false;
 // Estado del pago/retiro
 let order = null; // { ticketId, method, total, items, subtotal, igv, saving, qty, caja:{code,token,exp,used}, salida:{...}, status }
 let qrTimer = null;
@@ -114,6 +116,7 @@ function calcAge(birthStr) {
   return age;
 }
 function isAdultUser() {
+  if (demoMode) return true; // demo visual adulta, sin identidad persistida
   const u = getUser();
   if (!u) return false;
   if (typeof u.isAdult === "boolean") return u.isAdult;
@@ -392,22 +395,39 @@ function showView(name) {
   document.querySelectorAll(".bottom-nav button").forEach(b =>
     b.classList.toggle("active", b.dataset.nav === name));
   if (name !== "scanner") stopCamera();
-  if (getUser() && name !== "login") botGuideView(name);
+  if ((getUser() || demoMode) && name !== "login") botGuideView(name);
   window.scrollTo({ top: 0 });
 }
 
 function updateAuthUI() {
   const user = getUser();
-  const logged = !!user;
+  const logged = !!user || demoMode;
   $("appHeader").hidden = !logged;
   $("bottomNav").hidden = !logged;
-  if (logged) {
+  const badge = $("demoBadge");
+  if (demoMode && !user) {
+    $("headerUser").textContent = "Hola, Cliente demo";
+    if (badge) badge.hidden = false;
+    showView("home");
+  } else if (logged) {
+    if (badge) badge.hidden = true;
     const tag = user.isAdult === false ? " (menor 🔞)" : "";
     $("headerUser").textContent = "Hola, " + user.name.split(" ")[0] + tag;
     showView("home");
   } else {
+    if (badge) badge.hidden = true;
     showView("login");
   }
+}
+
+// Acceso de demostración: sesión solo visual, sin cuenta ni credenciales.
+// Reutiliza updateAuthUI/showView (la misma vía que abre la tienda al autenticarse).
+function enterDemo() {
+  if (demoMode) { showView("home"); return; }
+  demoMode = true;
+  updateAuthUI();
+  toast("⚡ Modo demo: explora la tienda 🛒");
+  botSay(`👋 <b>¡Hola, Cliente!</b> Soy <b>Tobi</b> 🤖. Estás en el modo de prueba de Tottus Scan &amp; Go: agrega productos del catálogo o pulsa 📷 <b>Escanear</b> (hay códigos de prueba). Yo te acompaño en tu compra hasta la salida 🛡️`);
 }
 
 // ---------- SCANNER (html5-qrcode vía CDN, con degradación a ingreso manual) ----------
@@ -567,6 +587,7 @@ function botClose() {
 }
 
 function firstName() {
+  if (demoMode) return "Cliente";
   const u = getUser();
   return u ? u.name.split(" ")[0] : "amigo/a";
 }
@@ -946,13 +967,11 @@ function init() {
     });
   }
 
-  // Acceso demo: entra sin escribir nada (ideal para exposición en clase)
-  $("btnDemo").addEventListener("click", () => {
-    localStorage.setItem("tottus_user", JSON.stringify({ name: "Cliente Demo", email: "demo@tottus.pe", dni: "12345678", birth: "2000-01-01", age: 26, isAdult: true }));
-    updateAuthUI();
-    toast("⚡ Entraste en modo DEMO ¡A comprar! 🛒");
-    botSay(`👋 <b>¡Hola, Cliente!</b> Soy <b>Tobi</b> 🤖. Estás en el modo de prueba de Tottus Scan &amp; Go: agrega productos del catálogo o pulsa 📷 <b>Escanear</b> (hay códigos de prueba). Yo te acompaño en tu compra hasta la salida 🛡️`);
-  });
+  // Probar demo: reutiliza enterDemo (misma vía que abre la tienda). Sin formularios ni credenciales.
+  if (!window._demoBound) {
+    window._demoBound = true;
+    $("btnDemo").addEventListener("click", enterDemo);
+  }
 
   // Login mejorado: ver/ocultar contraseña
   $("btnTogglePass").addEventListener("click", () => {
@@ -1033,6 +1052,7 @@ function init() {
       if (lastOpener) lastOpener.focus({ preventScroll: true });
       lastOpener = null;
     }
+    window._scanGoShowWelcome = showWelcome;
     const btnGoLogin = $("btnGoLogin");
     if (btnGoLogin) btnGoLogin.addEventListener("click", () => showEmailLogin(btnGoLogin));
     const btnGoRegister = $("btnGoRegister");
@@ -1123,9 +1143,11 @@ function init() {
     b.addEventListener("click", () => {
       if (b.dataset.nav === "logout") {
         localStorage.removeItem("tottus_user");
+        demoMode = false;
         stopCamera();
         stopQrTimer();
         botClose();
+        if (window._scanGoShowWelcome) window._scanGoShowWelcome();
         updateAuthUI();
         toast("Sesión cerrada");
       } else if (b.dataset.nav === "checkout") openCheckout();

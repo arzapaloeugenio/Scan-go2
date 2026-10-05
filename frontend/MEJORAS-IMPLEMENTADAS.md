@@ -363,3 +363,20 @@ Solo acceso/registro. Login (`#loginCard`), demo, catálogo, escáner, carrito, 
 | Estilo login reutilizado: `.login-card` blanca `max-width:420px`, `gap:16px`, `input min-height:48px`, `.field-error`/`.form-success`/`.auth-switch`, `margin-bottom:32px` para que TOBI/navegación no tapen controles; `overflow-x:hidden` global | `styles.css` |
 
 **Verificación:** `node --check app.js` OK; registro oculto inicial; solo registro visible; envío vacío → 6 errores; DNI letras/7-9 dígitos; mismatch; fecha futura; `Volver` → bienvenida; `Iniciar sesión` → solo login; sin scroll horizontal; TOBI no cubre botones.
+
+---
+
+## 22. ⚡ “Probar demo” como sesión visual (sin cuenta ni credenciales)
+
+Sin reconstruir acceso. Login, registro, validaciones, 14 productos, lector, carrito, pago y TOBI intactos.
+
+| Cambio | Dónde |
+|--------|-------|
+| Sesión demo solo en memoria `let demoMode=false`; `enterDemo()` activa el flag y reutiliza `updateAuthUI()` + `showView("home")` (misma vía que abre la tienda al autenticarse), sin abrir login/registro ni pedir datos | `app.js` |
+| Eliminado `localStorage.setItem(tottus_user, Cliente Demo...)`; sin cuenta falsa, sin email/DNI, sin contraseñas, sin backend, sin credenciales predeterminadas | `app.js` |
+| `updateAuthUI()` contempla `demoMode`: cabecera `Hola, Cliente demo` + `#demoBadge` `Modo demo` visible solo en demo; `showView` guía TOBI también en demo; `firstName()` → `Cliente` e `isAdultUser()` → `true` en demo para no limitar catálogo/escáner/carrito más allá de RN02/40 | `app.js`, `index.html` |
+| `Salir` restablece: `demoMode=false` + `stopCamera/stopQrTimer/botClose` + reutiliza `window._scanGoShowWelcome()` (oculta formularios, restaura 3 botones, limpia `#loginForm/#registerForm`, sin recarga) + `updateAuthUI()`; solo estado temporal, catálogo intacto | `app.js` |
+| Listener único `btnDemo → enterDemo` con guarda `_demoBound`; `Comenzar compra` sin referencias en código (solo mención histórica en docs), nada que eliminar en JS/HTML | `app.js` |
+| Botón terciario intacto + estados discretos `hover/focus-visible/active` sin animaciones; etiqueta `#demoBadge` blanca discreta con `hidden` inicial | `styles.css`, `index.html` |
+
+**Verificación:** `node --check app.js` OK; 3 botones iniciales; demo abre dashboard sin formularios con `Modo demo`; catálogo/escáner/carrito operativos; `Salir` regresa a bienvenida con formularios ocultos; reingreso sin eventos/productos duplicados; sin errores de consola.
