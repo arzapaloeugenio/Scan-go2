@@ -397,3 +397,22 @@ Sin reconstruir acceso ni añadir funciones/listeners duplicados. Dashboard, pro
 | Seguridad re-verificada: sin contraseñas en `localStorage`/`sessionStorage`/consola/URL; registro demo sin cuenta real; demo en memoria sin credenciales | `app.js` |
 
 **Verificación:** `node --check` OK; flujos 1–5 (login, registro, enlaces, demo, recarga sin forms/hash/errores); 320–1366 sin scroll horizontal ni superposición TOBI/navegación.
+
+---
+
+## 24. 🎨 Mejora visual del acceso existente (solo `styles.css`)
+
+Solo diseño. Login, registro y “Probar demo” funcionan igual; sin cambios de lógica, validaciones, OTP, dashboard, dependencias ni servicios externos.
+
+| Cambio | Dónde |
+|--------|-------|
+| Una sola vista visible: bienvenida / login / registro ya excluyentes; se conserva logo blanco + amarillo sobre fondo verde y 3 botones a todo el ancho | `index.html` intacto, `.hero-auth .hero-btn` |
+| Tarjetas blancas uniformes con sombra suave y `16px`: `.auth-card` y `.login-card` con mismo `max-width:420px`, `padding:20px`, `gap:12px`, `border:1px solid var(--border)`, `border-radius:16px`, `box-shadow:var(--shadow)` | `styles.css` (`.auth-card, .login-card`) |
+| Títulos, campos, botones y espaciado uniformes: `h2 19px`, `label 14px`, `input min-height:48px + font-size:16px`, `form gap:12px` | `styles.css` (`.auth-card/.login-card h2, p, form, label, input`) |
+| Etiquetas visibles en todos los campos y controles 👁️ conservados con área táctil `48px` sin tapar texto (`padding-right:52px`) | `styles.css` (`.pass-wrap`, `.pass-toggle`) |
+| Sin bordes verdes gruesos en acceso: eliminado `border-top:3px` de registro; `#view-login .btn-ghost` con `1px solid var(--border)` (el `.btn-ghost` global del dashboard no se toca) | `styles.css` (`#view-login .btn-ghost`) |
+| Transición discreta al cambiar de vista: `fadeSlide .25s` en `#loginHero, #loginCard, #loginForm` | `styles.css` |
+| TOBI no cubre campos/botones: `margin-bottom:84px` en tarjetas (`96px` en `<=430px`) + `scroll-margin-bottom:110px` y `overflow-x:clip` en `#view-login` | `styles.css` |
+| `320-430px`: tarjetas con `padding:16px` y margen inferior amplio; campos/botones `>=48px`; sin scroll horizontal | `styles.css` (`@media max-width:430px`) |
+
+**Verificación:** ningún formulario visible al cargar; sin `#loginForm/#registerForm` en URL; campos y botones `>=48px`; `320-430px` sin solapes; login, registro y demo siguen operativos. `git diff --stat`: solo `frontend/styles.css`.
