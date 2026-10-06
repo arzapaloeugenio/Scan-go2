@@ -435,9 +435,180 @@ function enterDemo() {
 
 // ---------- SCANNER (html5-qrcode vía CDN, con degradación a ingreso manual) ----------
 const SCANNER_UNAVAILABLE_MSG = "El escáner no está disponible. Puedes ingresar el código manualmente.";
+const SCANNER_HTTPS_MSG = "La cámara requiere HTTPS. La dirección HTTP de la red local no tiene permiso para utilizar la cámara. Abre la aplicación mediante HTTPS o usa el ingreso manual.";
+const SCANNER_PERMISSION_MSG = "El permiso de cámara fue rechazado. Actívalo desde la configuración del navegador.";
+const SCANNER_NO_CAMERA_MSG = "No se encontró una cámara disponible en este dispositivo.";
+const SCANNER_STARTED_MSG = "Cámara iniciada. Apunta al código de barras.";
+const SCANNER_READY_MSG = "Cámara lista. Mantén el código horizontal y estable.";
+const SCANNER_UNSTABLE_MSG = "Lectura inestable. Mantén el código quieto y bien iluminado.";
+const SCANNER_DETECTED_MSG = "Código detectado.";
+const SCANNER_UNKNOWN_MSG = "Código leído correctamente, pero no registrado en el catálogo.";
+const SCANNER_BUSY_MSG = "La cámara está siendo utilizada por otra aplicación.";
+const SCANNER_EXTERNAL_MSG = "El lector externo no está disponible. Usa el ingreso manual.";
+let scannerInitializing = false;
+let scanCandidate = "";
+let scanCandidateAt = 0;
+let scanProcessing = false;
+let lastConfirmedCode = "";
+let lastConfirmedAt = 0;
+const SCAN_CONFIRM_MS = 1800;
+const SCAN_CONFIRMED_REPEAT_MS = 3000;
 function isScannerLibAvailable() {
   if (window.__html5QrcodeCdnFailed) return false;
   return typeof window.Html5QrcodeScanner !== "undefined";
+}
+// Diagnóstico previo visible: solo lee propiedades, no abre la cámara ni usa getUserMedia como lector.
+function getScannerDiagnosis() {
+  return {
+    secure: window.isSecureContext,
+    hasMediaDevices: !!navigator.mediaDevices,
+    hasGetUserMedia: !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function"),
+    hasLibGlobal: typeof window.Html5QrcodeScanner !== "undefined",
+    cdnFailed: !!window.__html5QrcodeCdnFailed,
+    libAvailable: isScannerLibAvailable()
+  };
+}
+// Clasifica el error de apertura sin reintentar ni crear un segundo lector.
+function classifyScannerError(e) {
+  const name = (e && e.name) || "";
+  const msg = String((e && e.message) || e || "");
+  const blob = name + " " + msg;
+  if (name === "NotAllowedError" || /NotAllowed|Permission denied|Permission dismissed/i.test(blob)) return SCANNER_PERMISSION_MSG;
+  if (name === "NotReadableError" || name === "TrackStartError" || /in use|being used|busy|trackstart|notreadable/i.test(blob)) return SCANNER_BUSY_MSG;
+  if (name === "NotFoundError" || name === "OverconstrainedError" || /NotFound|Overconstrained|DevicesNotFound|no (camera|device)/i.test(blob)) return SCANNER_NO_CAMERA_MSG;
+  if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") return SCANNER_NO_CAMERA_MSG;
+  return "";
+}
+// Estabilidad EAN-13: normaliza, exige numérico, valida dígito verificador y
+// requiere dos lecturas consecutivas idénticas. Sin autocorrección.
+function normalizeScanText(raw) {
+  return String(raw || "").trim().replace(/[\s-]+/g, "");
+}
+function isNumericCode(s) {
+  return /^\d+$/.test(s);
+}
+function isRegisteredCode(s) {
+  return PRODUCTS.some((p) => p.code === s);
+}
+function isValidEan13(code) {
+  if (!/^\d{13}$/.test(code)) return false;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    const d = code.charCodeAt(i) - 48;
+    sum += (i % 2 === 0) ? d : d * 3;
+  }
+  const check = (10 - (sum % 10)) % 10;
+  return check === (code.charCodeAt(12) - 48);
+}
+function resetScanCandidate() {
+  scanCandidate = "";
+  scanCandidateAt = 0;
+}
+// Configuración del único lector: trasera preferente, marco horizontal 3:1 responsive, fps 10.
+// Solo añade formatos si la versión actual expone Html5QrcodeSupportedFormats; QR_CODE excluido.
+function buildScannerConfig() {
+  const qrboxFn = (vw, vh) => {
+    const w = Math.max(240, Math.min(640, Math.floor((vw || 400) * 0.8)));
+    return { width: w, height: Math.max(60, Math.floor(w / 3)) };
+  };
+  const cfg = {
+    fps: 10,
+    qrbox: qrboxFn,
+    videoConstraints: { facingMode: { ideal: "environment" } }
+  };
+  try {
+    const F = window.Html5QrcodeSupportedFormats;
+    if (F) {
+      const wanted = [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128].filter((v) => typeof v !== "undefined");
+      if (wanted.length === 5 && !wanted.includes(F.QR_CODE)) cfg.formatsToSupport = wanted;
+    }
+  } catch { /* conserva predeterminado */ }
+  return cfg;
+}
+// Zoom moderado solo si el track lo admite. Nunca falla ni fuerza enfoque.
+function applyModerateZoom() {
+  try {
+    const readerEl = $("reader");
+    if (!readerEl) return;
+    const video = readerEl.querySelector("video");
+    if (!video || !video.srcObject) return;
+    const tracks = (video.srcObject.getVideoTracks && video.srcObject.getVideoTracks()) || [];
+    const track = tracks[0];
+    if (!track || typeof track.getCapabilities !== "function") return;
+    const caps = track.getCapabilities() || {};
+    if (!caps.zoom) return;
+    const min = caps.zoom.min || 1;
+    const max = caps.zoom.max || 1;
+    if (!(max > min)) return;
+    const target = Math.min(max, Math.max(min, 1.4));
+    if (typeof track.applyConstraints === "function") {
+      track.applyConstraints({ advanced: [{ zoom: target }] }).catch(() => {});
+    }
+  } catch { /* zoom no disponible: continuar sin zoom */ }
+}
+function onScanSuccess(decodedText, decodedResult) {
+  if (scanProcessing) return;
+  const code = normalizeScanText(decodedText);
+  const statusEl = $("scannerStatus");
+  if (!code || !isNumericCode(code) || code.length < 6 || code.length > 14) {
+    resetScanCandidate();
+    if (statusEl) statusEl.textContent = SCANNER_UNSTABLE_MSG;
+    return;
+  }
+  if (code.length === 13 && !isValidEan13(code) && !isRegisteredCode(code)) {
+    resetScanCandidate();
+    if (statusEl) statusEl.textContent = SCANNER_UNSTABLE_MSG;
+    return;
+  }
+  const now = Date.now();
+  if (scanCandidate !== code) {
+    scanCandidate = code;
+    scanCandidateAt = now;
+    if (statusEl) statusEl.textContent = SCANNER_UNSTABLE_MSG;
+    return;
+  }
+  if ((now - scanCandidateAt) > SCAN_CONFIRM_MS) {
+    scanCandidate = code;
+    scanCandidateAt = now;
+    if (statusEl) statusEl.textContent = SCANNER_UNSTABLE_MSG;
+    return;
+  }
+  if (code === lastConfirmedCode && (now - lastConfirmedAt) < SCAN_CONFIRMED_REPEAT_MS) {
+    resetScanCandidate();
+    return;
+  }
+  lastConfirmedCode = code;
+  lastConfirmedAt = now;
+  resetScanCandidate();
+  scanProcessing = true;
+  const active = window._html5QrcodeScanner;
+  if (statusEl) statusEl.textContent = SCANNER_DETECTED_MSG;
+  const finalCode = code;
+  const finish = () => {
+    scanProcessing = false;
+    onScannedCode(finalCode);
+  };
+  if (active) {
+    active.clear().then(() => {
+      scannerRunning = false;
+      scannerInitializing = false;
+      window._html5QrcodeScanner = null;
+      const btnStart = $("btnStartCamera");
+      if (btnStart && isScannerLibAvailable()) btnStart.disabled = false;
+      finish();
+    }).catch(() => {
+      scannerRunning = false;
+      scannerInitializing = false;
+      window._html5QrcodeScanner = null;
+      const btnStart2 = $("btnStartCamera");
+      if (btnStart2 && isScannerLibAvailable()) btnStart2.disabled = false;
+      finish();
+    });
+  } else {
+    scannerRunning = false;
+    scannerInitializing = false;
+    finish();
+  }
 }
 function updateScannerAvailability() {
   const available = isScannerLibAvailable();
@@ -451,8 +622,8 @@ function updateScannerAvailability() {
   if (btnStart) btnStart.disabled = !available;
   if (btnStop) btnStop.disabled = !available;
   if (!available && statusEl) statusEl.textContent = SCANNER_UNAVAILABLE_MSG;
-  if (available && statusEl && !scannerRunning && statusEl.textContent === SCANNER_UNAVAILABLE_MSG) {
-    statusEl.textContent = "Cámara detenida";
+  if (available && statusEl && !scannerRunning && (statusEl.textContent === SCANNER_UNAVAILABLE_MSG || statusEl.textContent === "Cámara detenida")) {
+    statusEl.textContent = SCANNER_READY_MSG;
   }
   return available;
 }
@@ -461,41 +632,70 @@ function onScanFailure(error) {
 }
 
 async function startCamera() {
-  if (scannerRunning) return;
+  if (scannerRunning || scannerInitializing || window._html5QrcodeScanner) return;
   const statusEl = $("scannerStatus");
+  const btnStart = $("btnStartCamera");
   try {
+    // Caso CDN / lector externo: se conserva el mensaje de Fase 1 en estado y se distingue en aviso.
     if (!isScannerLibAvailable()) {
       updateScannerAvailability();
+      toast(SCANNER_EXTERNAL_MSG);
+      return;
+    }
+    // Diagnóstico previo: solo lectura de propiedades (window.isSecureContext,
+    // navigator.mediaDevices, getUserMedia, Html5QrcodeScanner, __html5QrcodeCdnFailed).
+    const diag = getScannerDiagnosis();
+    // Origen HTTP local inseguro: no se intenta abrir la cámara; el ingreso manual sigue activo.
+    if (diag.secure === false) {
+      scannerRunning = false;
+      scannerInitializing = false;
+      if (statusEl) statusEl.textContent = SCANNER_HTTPS_MSG;
+      toast("⚠️ Usa HTTPS o el ingreso manual");
+      return;
+    }
+    // Navegador sin soporte de cámara: mensaje propio, sin intentar el lector.
+    if (!diag.hasMediaDevices || !diag.hasGetUserMedia) {
+      scannerRunning = false;
+      scannerInitializing = false;
+      if (statusEl) statusEl.textContent = SCANNER_NO_CAMERA_MSG;
       toast("⚠️ Cámara no disponible, usa código manual");
       return;
     }
-    const html5QrcodeScanner = new window.Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+    // Una sola instancia: deshabilita "Iniciar cámara" mientras se inicializa. Permiso solo aquí.
+    scannerInitializing = true;
+    resetScanCandidate();
+    scanProcessing = false;
+    if (btnStart) btnStart.disabled = true;
+    const html5QrcodeScanner = new window.Html5QrcodeScanner("reader", buildScannerConfig(), false);
     window._html5QrcodeScanner = html5QrcodeScanner;
-    scannerRunning = true;
-    scanT0 = performance.now();
-    if (statusEl) statusEl.textContent = "📷 Apunta al código de barras...";
-    function onScanSuccess(decodedText, decodedResult) {
-      html5QrcodeScanner.clear().then(() => {
-        scannerRunning = false;
-        window._html5QrcodeScanner = null;
-        if (statusEl) statusEl.textContent = "✅ Código leído";
-        onScannedCode(decodedText);
-      }).catch(() => {
-        scannerRunning = false;
-        onScannedCode(decodedText);
-      });
-    }
     html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    // Medición real: inicia cuando el lector quedó preparado (tras render), se detiene en onScanSuccess().
+    scannerRunning = true;
+    scannerInitializing = false;
+    scanT0 = performance.now();
+    if (statusEl) statusEl.textContent = SCANNER_STARTED_MSG;
+    setTimeout(applyModerateZoom, 1200);
   } catch (e) {
     scannerRunning = false;
+    scannerInitializing = false;
+    scanProcessing = false;
+    resetScanCandidate();
     window._html5QrcodeScanner = null;
     try {
       const readerEl = $("reader");
       if (readerEl) readerEl.innerHTML = "";
     } catch { /* noop */ }
-    // No se reintenta: se deja el ingreso manual operativo y se refleja el estado real del CDN.
+    // No se reintenta ni se crea un segundo lector: se deja el ingreso manual operativo.
     updateScannerAvailability();
-    if (isScannerLibAvailable() && statusEl) statusEl.textContent = "⚠️ No se pudo abrir la cámara. Usa ingreso manual.";
+    if (isScannerLibAvailable()) {
+      if (btnStart) btnStart.disabled = false;
+      if (statusEl) {
+        const mapped = classifyScannerError(e);
+        statusEl.textContent = mapped || "⚠️ No se pudo abrir la cámara. Usa ingreso manual.";
+      }
+    } else if (statusEl) {
+      statusEl.textContent = SCANNER_UNAVAILABLE_MSG;
+    }
     toast("⚠️ Cámara no disponible, usa código manual");
   }
 }
@@ -509,15 +709,33 @@ async function stopCamera() {
     }
   } catch { /* noop */ }
   scannerRunning = false;
+  scannerInitializing = false;
+  scanProcessing = false;
+  resetScanCandidate();
   try {
     const readerEl = $("reader");
     if (readerEl) readerEl.innerHTML = "";
   } catch { /* noop */ }
+  const btnStart = $("btnStartCamera");
+  if (btnStart && isScannerLibAvailable()) btnStart.disabled = false;
   const st = $("scannerStatus");
-  if (st && $("view-scanner").hidden === false) st.textContent = "Cámara detenida";
+  if (st && $("view-scanner").hidden === false) st.textContent = SCANNER_READY_MSG;
 }
 
-function onScannedCode(code) {
+function onScannedCode(rawCode) {
+  const code = normalizeScanText(rawCode);
+  if (!code || !isNumericCode(code)) {
+    $("scanResult").textContent = SCANNER_UNSTABLE_MSG;
+    beep(false);
+    scanT0 = 0;
+    return;
+  }
+  if (code.length === 13 && !isValidEan13(code) && !isRegisteredCode(code)) {
+    $("scanResult").textContent = SCANNER_UNSTABLE_MSG;
+    beep(false);
+    scanT0 = 0;
+    return;
+  }
   if (isFastLimitReached(1)) {
     $("scanResult").textContent = "⛔ Límite de 40 alcanzado: no se agregará el artículo 41.";
     showFastLimitModal();
@@ -525,9 +743,18 @@ function onScannedCode(code) {
     scanT0 = 0;
     return;
   }
+  // Tiempo real de detección: sin meta automática, sin simulación.
   const dt = scanT0 ? ((performance.now() - scanT0) / 1000) : 0;
-  const perf = dt ? ` <span class="perf-hint">⏱️ ${dt.toFixed(1)}s (meta &lt;3s ${dt < 3 ? "✅" : "⚠️"})</span>` : "";
-  $("scanResult").innerHTML = "Código detectado: " + code.replace(/</g, "&lt;") + perf;
+  const perf = dt ? ` <span class="perf-hint">⏱️ ${dt.toFixed(1)}s</span>` : "";
+  const prod = PRODUCTS.find((p) => p.code === code);
+  if (!prod) {
+    $("scanResult").innerHTML = SCANNER_UNKNOWN_MSG + " " + code.replace(/</g, "&lt;") + perf;
+    beep(false);
+    toast("❌ Código no encontrado");
+    scanT0 = 0;
+    return;
+  }
+  $("scanResult").innerHTML = SCANNER_DETECTED_MSG + " " + code.replace(/</g, "&lt;") + perf;
   const ok = addToCart(code, 1);
   beep(ok);
   if (ok) $("scanResult").innerHTML = "✅ Agregado: " + code.replace(/</g, "&lt;") + perf;
