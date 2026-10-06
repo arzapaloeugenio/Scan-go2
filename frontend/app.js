@@ -433,7 +433,7 @@ function enterDemo() {
   botSay(`👋 <b>¡Hola, Cliente!</b> Soy <b>Tobi</b> 🤖. Estás en el modo de prueba de Tottus Scan &amp; Go: agrega productos del catálogo o pulsa 📷 <b>Escanear</b> (hay códigos de prueba). Yo te acompaño en tu compra hasta la salida 🛡️`);
 }
 
-// ---------- SCANNER (html5-qrcode vía CDN, con degradación a ingreso manual) ----------
+// ---------- SCANNER (Quagga2 vía CDN, con degradación a ingreso manual) ----------
 const SCANNER_UNAVAILABLE_MSG = "El escáner no está disponible. Puedes ingresar el código manualmente.";
 const SCANNER_HTTPS_MSG = "La cámara requiere HTTPS. La dirección HTTP de la red local no tiene permiso para utilizar la cámara. Abre la aplicación mediante HTTPS o usa el ingreso manual.";
 const SCANNER_PERMISSION_MSG = "El permiso de cámara fue rechazado. Actívalo desde la configuración del navegador.";
@@ -442,20 +442,22 @@ const SCANNER_STARTED_MSG = "Cámara activa. Alinea las barras dentro del marco.
 const SCANNER_READY_MSG = "Cámara lista. Mantén el código horizontal y estable.";
 const SCANNER_UNSTABLE_MSG = "Lectura inestable. Mantén el código quieto y bien iluminado.";
 const SCANNER_DETECTED_MSG = "Código detectado.";
-const SCANNER_UNKNOWN_MSG = "Código leído correctamente, pero no registrado en el catálogo.";
+const SCANNER_UNKNOWN_MSG = "Código leído correctamente, pero no registrado:";
+const SCANNER_ADDED_MSG = "Producto agregado:";
 const SCANNER_BUSY_MSG = "La cámara está siendo utilizada por otra aplicación.";
 const SCANNER_EXTERNAL_MSG = "El lector externo no está disponible. Usa el ingreso manual.";
 let scannerInitializing = false;
 let scanCandidate = "";
 let scanCandidateAt = 0;
+let scanCandidateCount = 0;
 let scanProcessing = false;
 let lastConfirmedCode = "";
 let lastConfirmedAt = 0;
 const SCAN_CONFIRM_MS = 1800;
 const SCAN_CONFIRMED_REPEAT_MS = 3000;
 function isScannerLibAvailable() {
-  if (window.__html5QrcodeCdnFailed) return false;
-  return typeof window.Html5Qrcode !== "undefined";
+  if (window.__quaggaCdnFailed) return false;
+  return typeof window.Quagga !== "undefined" && !!window.Quagga;
 }
 // Diagnóstico previo visible: solo lee propiedades, no abre la cámara ni usa getUserMedia como lector.
 function getScannerDiagnosis() {
@@ -463,8 +465,8 @@ function getScannerDiagnosis() {
     secure: window.isSecureContext,
     hasMediaDevices: !!navigator.mediaDevices,
     hasGetUserMedia: !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function"),
-    hasLibGlobal: typeof window.Html5Qrcode !== "undefined",
-    cdnFailed: !!window.__html5QrcodeCdnFailed,
+    hasLibGlobal: typeof window.Quagga !== "undefined",
+    cdnFailed: !!window.__quaggaCdnFailed,
     libAvailable: isScannerLibAvailable()
   };
 }
@@ -503,27 +505,54 @@ function isValidEan13(code) {
 function resetScanCandidate() {
   scanCandidate = "";
   scanCandidateAt = 0;
+  scanCandidateCount = 0;
 }
-// Configuración del único lector (API bajo nivel): fps 10, marco horizontal 3:1 responsive.
-// Cámara trasera se pide en start() con facingMode ideal. Solo añade formatos si la
-// versión actual expone Html5QrcodeSupportedFormats; QR_CODE excluido.
-function buildScannerConfig() {
-  const qrboxFn = (vw, vh) => {
-    const w = Math.max(240, Math.min(640, Math.floor((vw || 400) * 0.85)));
-    return { width: w, height: Math.max(60, Math.floor(w / 3)) };
+// Configuración inicial Quagga2 (1D, sin QR): LiveStream en #reader, trasera,
+// locate y frecuencia 10. Solo lectores 1D indicados.
+function buildQuaggaConfig() {
+  return {
+    inputStream: {
+      type: "LiveStream",
+      target: document.querySelector("#reader"),
+      constraints: {
+        facingMode: "environment",
+        width: { min: 320 },
+        height: { min: 240 }
+      },
+      area: { top: "35%", right: "8%", bottom: "35%", left: "8%" }
+    },
+    locator: { patchSize: "medium", halfSample: true },
+    decoder: {
+      readers: ["ean_reader", "ean_8_reader", "upc_reader", "upc_e_reader", "code_128_reader"],
+      multiple: false
+    },
+    locate: true,
+    frequency: 10
   };
-  const cfg = {
-    fps: 10,
-    qrbox: qrboxFn
-  };
+}
+// Un solo listener onDetected: extrae código y formato, reutiliza onScanSuccess().
+function handleQuaggaDetected(result) {
   try {
-    const F = window.Html5QrcodeSupportedFormats;
-    if (F) {
-      const wanted = [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128].filter((v) => typeof v !== "undefined");
-      if (wanted.length === 5 && !wanted.includes(F.QR_CODE)) cfg.formatsToSupport = wanted;
+    const cr = result && result.codeResult;
+    const raw = cr && cr.code;
+    const format = cr && cr.format;
+    if (!raw) return;
+    onScanSuccess(raw, { format: format || "" });
+  } catch { /* noop */ }
+}
+function ensureQuaggaDetectedListener() {
+  if (window._quaggaDetectedBound) return;
+  if (!window.Quagga || typeof window.Quagga.onDetected !== "function") return;
+  window._quaggaDetectedBound = true;
+  window.Quagga.onDetected(handleQuaggaDetected);
+}
+function detachQuaggaDetectedListener() {
+  try {
+    if (window.Quagga && typeof window.Quagga.offDetected === "function") {
+      window.Quagga.offDetected(handleQuaggaDetected);
     }
-  } catch { /* conserva predeterminado */ }
-  return cfg;
+  } catch { /* noop */ }
+  window._quaggaDetectedBound = false;
 }
 // Zoom moderado solo si el track lo admite. Nunca falla ni fuerza enfoque.
 function applyModerateZoom() {
@@ -548,6 +577,7 @@ function applyModerateZoom() {
 }
 function onScanSuccess(decodedText, decodedResult) {
   if (scanProcessing) return;
+  // String exacto: conserva ceros iniciales, sin Number, sin autocorrección ni parciales.
   const code = normalizeScanText(decodedText);
   const statusEl = $("scannerStatus");
   if (!code || !isNumericCode(code) || code.length < 6 || code.length > 14) {
@@ -561,15 +591,24 @@ function onScanSuccess(decodedText, decodedResult) {
     return;
   }
   const now = Date.now();
+  // Si cambia un dígito, reinicia el contador del candidato.
   if (scanCandidate !== code) {
     scanCandidate = code;
     scanCandidateAt = now;
+    scanCandidateCount = 1;
     if (statusEl) statusEl.textContent = SCANNER_UNSTABLE_MSG;
     return;
   }
   if ((now - scanCandidateAt) > SCAN_CONFIRM_MS) {
     scanCandidate = code;
     scanCandidateAt = now;
+    scanCandidateCount = 1;
+    if (statusEl) statusEl.textContent = SCANNER_UNSTABLE_MSG;
+    return;
+  }
+  scanCandidateCount += 1;
+  // Acepta tras dos detecciones idénticas consecutivas; sin "no encontrado" previo.
+  if (scanCandidateCount < 2) {
     if (statusEl) statusEl.textContent = SCANNER_UNSTABLE_MSG;
     return;
   }
@@ -581,18 +620,17 @@ function onScanSuccess(decodedText, decodedResult) {
   lastConfirmedAt = now;
   resetScanCandidate();
   scanProcessing = true;
-  const active = window._html5Qrcode;
+  const wasRunning = !!window._quaggaRunning;
   if (statusEl) statusEl.textContent = SCANNER_DETECTED_MSG;
   const finalCode = code;
-  const releaseAndFinish = async () => {
+  const releaseAndFinish = () => {
     try {
-      const cur = window._html5Qrcode;
-      if (cur) {
-        try { await cur.stop(); } catch { /* ya detenida */ }
-        try { cur.clear(); } catch { /* noop */ }
-        window._html5Qrcode = null;
+      if (window.Quagga && window._quaggaRunning) {
+        try { window.Quagga.stop(); } catch { /* ya detenida */ }
       }
-    } catch { window._html5Qrcode = null; }
+    } catch { /* noop */ }
+    detachQuaggaDetectedListener();
+    window._quaggaRunning = false;
     scannerRunning = false;
     scannerInitializing = false;
     scanProcessing = false;
@@ -604,7 +642,7 @@ function onScanSuccess(decodedText, decodedResult) {
     if (btnStart && isScannerLibAvailable()) btnStart.disabled = false;
     onScannedCode(finalCode);
   };
-  if (active) {
+  if (wasRunning) {
     releaseAndFinish();
   } else {
     scannerRunning = false;
@@ -635,7 +673,7 @@ function onScanFailure(error) {
 }
 
 async function startCamera() {
-  if (scannerRunning || scannerInitializing || window._html5Qrcode) return;
+  if (scannerRunning || scannerInitializing || window._quaggaRunning) return;
   const statusEl = $("scannerStatus");
   const btnStart = $("btnStartCamera");
   try {
@@ -664,40 +702,60 @@ async function startCamera() {
       toast("⚠️ Cámara no disponible, usa código manual");
       return;
     }
-    // Una sola instancia de bajo nivel en #reader. Permiso solo aquí, sin auto-apertura.
+    // Una sola instancia Quagga2 en #reader. Permiso solo aquí, sin auto-apertura.
     scannerInitializing = true;
     resetScanCandidate();
     scanProcessing = false;
     if (btnStart) btnStart.disabled = true;
-    const readerEl0 = $("reader");
-    if (readerEl0) readerEl0.innerHTML = "";
-    const html5Qrcode = new window.Html5Qrcode("reader", false);
-    window._html5Qrcode = html5Qrcode;
-    await html5Qrcode.start(
-      { facingMode: { ideal: "environment" } },
-      buildScannerConfig(),
-      onScanSuccess,
-      onScanFailure
-    );
-    // Medición real: inicia cuando el lector quedó preparado (tras start), se detiene en onScanSuccess().
-    scannerRunning = true;
-    scannerInitializing = false;
-    scanT0 = performance.now();
-    if (statusEl) statusEl.textContent = SCANNER_STARTED_MSG;
-    setTimeout(applyModerateZoom, 1200);
+    ensureQuaggaDetectedListener();
+    window.Quagga.init(buildQuaggaConfig(), (initErr) => {
+      if (initErr) {
+        scannerRunning = false;
+        scannerInitializing = false;
+        scanProcessing = false;
+        resetScanCandidate();
+        window._quaggaRunning = false;
+        try { window.Quagga.stop(); } catch { /* noop */ }
+        updateScannerAvailability();
+        if (isScannerLibAvailable() && statusEl) {
+          statusEl.textContent = classifyScannerError(initErr) || "⚠️ No se pudo abrir la cámara. Usa ingreso manual.";
+        } else if (statusEl) {
+          statusEl.textContent = SCANNER_UNAVAILABLE_MSG;
+        }
+        if (btnStart && isScannerLibAvailable()) btnStart.disabled = false;
+        else if (btnStart) updateScannerAvailability();
+        toast("⚠️ Cámara no disponible, usa código manual");
+        return;
+      }
+      try {
+        window.Quagga.start();
+      } catch (e) {
+        scannerRunning = false;
+        scannerInitializing = false;
+        window._quaggaRunning = false;
+        updateScannerAvailability();
+        if (isScannerLibAvailable() && statusEl) {
+          statusEl.textContent = classifyScannerError(e) || "⚠️ No se pudo abrir la cámara. Usa ingreso manual.";
+        }
+        if (btnStart && isScannerLibAvailable()) btnStart.disabled = false;
+        toast("⚠️ Cámara no disponible, usa código manual");
+        return;
+      }
+      // Medición real: inicia cuando el lector quedó preparado (tras start).
+      window._quaggaRunning = true;
+      scannerRunning = true;
+      scannerInitializing = false;
+      scanT0 = performance.now();
+      if (statusEl) statusEl.textContent = SCANNER_STARTED_MSG;
+      setTimeout(applyModerateZoom, 1200);
+    });
   } catch (e) {
     scannerRunning = false;
     scannerInitializing = false;
     scanProcessing = false;
     resetScanCandidate();
-    try {
-      const cur = window._html5Qrcode;
-      if (cur) {
-        try { await cur.stop(); } catch { /* noop */ }
-        try { cur.clear(); } catch { /* noop */ }
-      }
-    } catch { /* noop */ }
-    window._html5Qrcode = null;
+    try { if (window.Quagga) window.Quagga.stop(); } catch { /* noop */ }
+    window._quaggaRunning = false;
     try {
       const readerEl = $("reader");
       if (readerEl) readerEl.innerHTML = "";
@@ -719,13 +777,12 @@ async function startCamera() {
 
 async function stopCamera() {
   try {
-    const active = window._html5Qrcode;
-    if (active) {
-      try { await active.stop(); } catch { /* ya detenida */ }
-      try { active.clear(); } catch { /* noop */ }
-      window._html5Qrcode = null;
+    if (window.Quagga && window._quaggaRunning) {
+      try { window.Quagga.stop(); } catch { /* ya detenida */ }
     }
-  } catch { window._html5Qrcode = null; }
+  } catch { /* noop */ }
+  detachQuaggaDetectedListener();
+  window._quaggaRunning = false;
   scannerRunning = false;
   scannerInitializing = false;
   scanProcessing = false;
@@ -761,21 +818,20 @@ function onScannedCode(rawCode) {
     scanT0 = 0;
     return;
   }
-  // Tiempo real de detección: sin meta automática, sin simulación.
+  // Tiempo real de detección con meta menor de 3 segundos, sin simulación.
   const dt = scanT0 ? ((performance.now() - scanT0) / 1000) : 0;
-  const perf = dt ? ` <span class="perf-hint">⏱️ ${dt.toFixed(1)}s</span>` : "";
+  const perf = dt ? ` <span class="perf-hint">⏱️ ${dt.toFixed(1)}s (meta &lt;3s ${dt < 3 ? "✅" : "⚠️"})</span>` : "";
   const prod = PRODUCTS.find((p) => p.code === code);
   if (!prod) {
     $("scanResult").innerHTML = SCANNER_UNKNOWN_MSG + " " + code.replace(/</g, "&lt;") + perf;
     beep(false);
-    toast("❌ Código no encontrado");
     scanT0 = 0;
     return;
   }
   $("scanResult").innerHTML = SCANNER_DETECTED_MSG + " " + code.replace(/</g, "&lt;") + perf;
   const ok = addToCart(code, 1);
   beep(ok);
-  if (ok) $("scanResult").innerHTML = "✅ Agregado: " + code.replace(/</g, "&lt;") + perf;
+  if (ok) $("scanResult").innerHTML = SCANNER_ADDED_MSG + " " + prod.name.replace(/</g, "&lt;") + perf;
   scanT0 = 0;
 }
 
@@ -1157,11 +1213,11 @@ function init() {
   updateAuthUI();
   // Estado inicial del escáner según el CDN (no bloquea el resto de la app).
   updateScannerAvailability();
-  const cdnScript = document.getElementById("html5qrcode-cdn");
+  const cdnScript = document.getElementById("quagga2-cdn");
   if (cdnScript && !cdnScript._scanGoErrorBound) {
     cdnScript._scanGoErrorBound = true;
     cdnScript.addEventListener("error", () => {
-      window.__html5QrcodeCdnFailed = true;
+      window.__quaggaCdnFailed = true;
       updateScannerAvailability();
     });
   }
