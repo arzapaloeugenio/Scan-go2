@@ -438,7 +438,7 @@ const SCANNER_UNAVAILABLE_MSG = "El escáner no está disponible. Puedes ingresa
 const SCANNER_HTTPS_MSG = "La cámara requiere HTTPS. La dirección HTTP de la red local no tiene permiso para utilizar la cámara. Abre la aplicación mediante HTTPS o usa el ingreso manual.";
 const SCANNER_PERMISSION_MSG = "El permiso de cámara fue rechazado. Actívalo desde la configuración del navegador.";
 const SCANNER_NO_CAMERA_MSG = "No se encontró una cámara disponible en este dispositivo.";
-const SCANNER_STARTED_MSG = "Cámara iniciada. Apunta al código de barras.";
+const SCANNER_STARTED_MSG = "Cámara activa. Alinea las barras dentro del marco.";
 const SCANNER_READY_MSG = "Cámara lista. Mantén el código horizontal y estable.";
 const SCANNER_UNSTABLE_MSG = "Lectura inestable. Mantén el código quieto y bien iluminado.";
 const SCANNER_DETECTED_MSG = "Código detectado.";
@@ -455,7 +455,7 @@ const SCAN_CONFIRM_MS = 1800;
 const SCAN_CONFIRMED_REPEAT_MS = 3000;
 function isScannerLibAvailable() {
   if (window.__html5QrcodeCdnFailed) return false;
-  return typeof window.Html5QrcodeScanner !== "undefined";
+  return typeof window.Html5Qrcode !== "undefined";
 }
 // Diagnóstico previo visible: solo lee propiedades, no abre la cámara ni usa getUserMedia como lector.
 function getScannerDiagnosis() {
@@ -463,7 +463,7 @@ function getScannerDiagnosis() {
     secure: window.isSecureContext,
     hasMediaDevices: !!navigator.mediaDevices,
     hasGetUserMedia: !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function"),
-    hasLibGlobal: typeof window.Html5QrcodeScanner !== "undefined",
+    hasLibGlobal: typeof window.Html5Qrcode !== "undefined",
     cdnFailed: !!window.__html5QrcodeCdnFailed,
     libAvailable: isScannerLibAvailable()
   };
@@ -504,17 +504,17 @@ function resetScanCandidate() {
   scanCandidate = "";
   scanCandidateAt = 0;
 }
-// Configuración del único lector: trasera preferente, marco horizontal 3:1 responsive, fps 10.
-// Solo añade formatos si la versión actual expone Html5QrcodeSupportedFormats; QR_CODE excluido.
+// Configuración del único lector (API bajo nivel): fps 10, marco horizontal 3:1 responsive.
+// Cámara trasera se pide en start() con facingMode ideal. Solo añade formatos si la
+// versión actual expone Html5QrcodeSupportedFormats; QR_CODE excluido.
 function buildScannerConfig() {
   const qrboxFn = (vw, vh) => {
-    const w = Math.max(240, Math.min(640, Math.floor((vw || 400) * 0.8)));
+    const w = Math.max(240, Math.min(640, Math.floor((vw || 400) * 0.85)));
     return { width: w, height: Math.max(60, Math.floor(w / 3)) };
   };
   const cfg = {
     fps: 10,
-    qrbox: qrboxFn,
-    videoConstraints: { facingMode: { ideal: "environment" } }
+    qrbox: qrboxFn
   };
   try {
     const F = window.Html5QrcodeSupportedFormats;
@@ -581,33 +581,36 @@ function onScanSuccess(decodedText, decodedResult) {
   lastConfirmedAt = now;
   resetScanCandidate();
   scanProcessing = true;
-  const active = window._html5QrcodeScanner;
+  const active = window._html5Qrcode;
   if (statusEl) statusEl.textContent = SCANNER_DETECTED_MSG;
   const finalCode = code;
-  const finish = () => {
+  const releaseAndFinish = async () => {
+    try {
+      const cur = window._html5Qrcode;
+      if (cur) {
+        try { await cur.stop(); } catch { /* ya detenida */ }
+        try { cur.clear(); } catch { /* noop */ }
+        window._html5Qrcode = null;
+      }
+    } catch { window._html5Qrcode = null; }
+    scannerRunning = false;
+    scannerInitializing = false;
     scanProcessing = false;
+    try {
+      const readerEl = $("reader");
+      if (readerEl) readerEl.innerHTML = "";
+    } catch { /* noop */ }
+    const btnStart = $("btnStartCamera");
+    if (btnStart && isScannerLibAvailable()) btnStart.disabled = false;
     onScannedCode(finalCode);
   };
   if (active) {
-    active.clear().then(() => {
-      scannerRunning = false;
-      scannerInitializing = false;
-      window._html5QrcodeScanner = null;
-      const btnStart = $("btnStartCamera");
-      if (btnStart && isScannerLibAvailable()) btnStart.disabled = false;
-      finish();
-    }).catch(() => {
-      scannerRunning = false;
-      scannerInitializing = false;
-      window._html5QrcodeScanner = null;
-      const btnStart2 = $("btnStartCamera");
-      if (btnStart2 && isScannerLibAvailable()) btnStart2.disabled = false;
-      finish();
-    });
+    releaseAndFinish();
   } else {
     scannerRunning = false;
     scannerInitializing = false;
-    finish();
+    scanProcessing = false;
+    onScannedCode(finalCode);
   }
 }
 function updateScannerAvailability() {
@@ -632,7 +635,7 @@ function onScanFailure(error) {
 }
 
 async function startCamera() {
-  if (scannerRunning || scannerInitializing || window._html5QrcodeScanner) return;
+  if (scannerRunning || scannerInitializing || window._html5Qrcode) return;
   const statusEl = $("scannerStatus");
   const btnStart = $("btnStartCamera");
   try {
@@ -642,8 +645,8 @@ async function startCamera() {
       toast(SCANNER_EXTERNAL_MSG);
       return;
     }
-    // Diagnóstico previo: solo lectura de propiedades (window.isSecureContext,
-    // navigator.mediaDevices, getUserMedia, Html5QrcodeScanner, __html5QrcodeCdnFailed).
+    // Diagnóstico previo: solo lectura de propiedades (contexto seguro,
+    // cámara, librería y fallo CDN).
     const diag = getScannerDiagnosis();
     // Origen HTTP local inseguro: no se intenta abrir la cámara; el ingreso manual sigue activo.
     if (diag.secure === false) {
@@ -661,15 +664,22 @@ async function startCamera() {
       toast("⚠️ Cámara no disponible, usa código manual");
       return;
     }
-    // Una sola instancia: deshabilita "Iniciar cámara" mientras se inicializa. Permiso solo aquí.
+    // Una sola instancia de bajo nivel en #reader. Permiso solo aquí, sin auto-apertura.
     scannerInitializing = true;
     resetScanCandidate();
     scanProcessing = false;
     if (btnStart) btnStart.disabled = true;
-    const html5QrcodeScanner = new window.Html5QrcodeScanner("reader", buildScannerConfig(), false);
-    window._html5QrcodeScanner = html5QrcodeScanner;
-    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
-    // Medición real: inicia cuando el lector quedó preparado (tras render), se detiene en onScanSuccess().
+    const readerEl0 = $("reader");
+    if (readerEl0) readerEl0.innerHTML = "";
+    const html5Qrcode = new window.Html5Qrcode("reader", false);
+    window._html5Qrcode = html5Qrcode;
+    await html5Qrcode.start(
+      { facingMode: { ideal: "environment" } },
+      buildScannerConfig(),
+      onScanSuccess,
+      onScanFailure
+    );
+    // Medición real: inicia cuando el lector quedó preparado (tras start), se detiene en onScanSuccess().
     scannerRunning = true;
     scannerInitializing = false;
     scanT0 = performance.now();
@@ -680,7 +690,14 @@ async function startCamera() {
     scannerInitializing = false;
     scanProcessing = false;
     resetScanCandidate();
-    window._html5QrcodeScanner = null;
+    try {
+      const cur = window._html5Qrcode;
+      if (cur) {
+        try { await cur.stop(); } catch { /* noop */ }
+        try { cur.clear(); } catch { /* noop */ }
+      }
+    } catch { /* noop */ }
+    window._html5Qrcode = null;
     try {
       const readerEl = $("reader");
       if (readerEl) readerEl.innerHTML = "";
@@ -702,12 +719,13 @@ async function startCamera() {
 
 async function stopCamera() {
   try {
-    const active = window._html5QrcodeScanner;
+    const active = window._html5Qrcode;
     if (active) {
-      await active.clear();
-      window._html5QrcodeScanner = null;
+      try { await active.stop(); } catch { /* ya detenida */ }
+      try { active.clear(); } catch { /* noop */ }
+      window._html5Qrcode = null;
     }
-  } catch { /* noop */ }
+  } catch { window._html5Qrcode = null; }
   scannerRunning = false;
   scannerInitializing = false;
   scanProcessing = false;
