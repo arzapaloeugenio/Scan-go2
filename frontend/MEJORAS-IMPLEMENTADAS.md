@@ -586,3 +586,43 @@ El visor debía dejar de parecer un lector QR.
 | Textos: título `Lector de código de barras` (sin emoji), instrucción de marco horizontal, ayuda 15–25 cm, activo `Cámara activa. Alinea las barras dentro del rectángulo.` | `index.html`, `app.js` |
 
 **Verificación:** marco 272×90 (320px) a 366×90+ (430px); sin `Select Camera`/`Stop Scanning`; video sin deformar; `320–430px` sin scroll-x.
+
+---
+
+## 36. 🏷️ Mensaje exacto de código no registrado (solo `app.js`)
+
+Cámara y manual comparten `onScannedCode()`; el texto anterior no coincidía con el formato pedido y usaba `innerHTML`.
+
+| Cambio | Dónde |
+|--------|-------|
+| `SCANNER_UNKNOWN_MSG`: `"Código leído correctamente, pero no registrado:"` → `"Código de barras no registrado:"` | `app.js` |
+| Rama `if (!prod)`: `innerHTML + code.replace + perf` → `textContent = SCANNER_UNKNOWN_MSG + " " + code` (valor real como texto, ceros intactos, inserción segura, reutiliza `#scanResult`) | `app.js` (`onScannedCode`) |
+| Flujo exitoso (`7750123450013` → Leche Gloria + `addToCart`), manual, anti-duplicado, cámara, 14 productos y carrito intactos; sin dependencias ni listeners nuevos | — |
+
+**Verificación:** `node --check` OK; revisión lógica: no registrado muestra `Código de barras no registrado: [número leído]` una sola vez.
+
+---
+
+## 37. 📷 Estados visuales del lector según cámara activa/inactiva (sin tocar su lógica)
+
+El visor negro, el marco y la línea verde aparecían antes de pulsar “Activar cámara”.
+
+| Cambio | Dónde |
+|--------|-------|
+| `#reader` con `hidden` inicial (sin visor ni altura reservada) + `#scannerIdleHint` (“La cámara está desactivada. Presiona Activar cámara para comenzar.”) + `#scanAlignHint` con `hidden` | `index.html` (`#view-scanner`) |
+| `scannerIn` (.32s opacidad + vertical) y `scanLine` (2.2s contenida ±34px) solo en `#reader.is-active`; `::before/::after` con `opacity: 0` fuera de activo; botones con transiciones y `disabled: opacity .55` (todo scopado `#view-scanner`, `prefers-reduced-motion` global) | `styles.css` |
+| `+ SCANNER_STARTING_MSG` (“Iniciando cámara...”) y `setScannerVisual(active)` (única función visual: visor + hints); `startCamera` (ambos botones disabled durante arranque, visor oculto hasta `start()` OK), éxito (visor + marco + línea, `Activar` off / `Detener` on), errores/stop/`releaseAndFinish` (ocultan visor, botones a inactivo, manual intacto, mensajes existentes) | `app.js` |
+| Sin cambios de librería, formatos EAN/UPC/CODE-128, cámara trasera, `onScannedCode`, productos, carrito, login, pago, TOBI; sin `setTimeout` nuevo de estado; sin duplicados | — |
+
+**Verificación:** `node --check` OK; entrar muestra solo hint; activar OK revela visor/marco/línea; detener restaura; reactivar sin instancias/listeners extra; manual operativo apagado.
+
+---
+
+## 38. ✂️ Simplificación de textos del lector (solo `index.html` + `styles.css`, pendiente de commit)
+
+| Cambio | Dónde |
+|--------|-------|
+| Eliminados los 2 `<p>` (“Coloca todas las barras dentro del marco horizontal.” y “Mantén el código quieto, bien iluminado y a una distancia de 15 a 25 cm.”); conservados título, `#scannerIdleHint` (solo apagada), `#scanAlignHint` (solo activa), `.scanner-viewport`, botones y manual | `index.html` |
+| `+ .scanner-card > h2 { margin: 0 0 6px }`, `.scanner-idle-hint` a `margin: 2px 0 10px`; sin contenedores vacíos (clases genéricas), sin cambios de colores/tamaños/responsive/animaciones | `styles.css` |
+
+**Verificación:** grep 0 coincidencias de los textos eliminados; idle solo apagada; visor/marco/línea solo activa; `git diff --stat`: solo `frontend/index.html` + `frontend/styles.css`. Sin commit, sin prueba física.

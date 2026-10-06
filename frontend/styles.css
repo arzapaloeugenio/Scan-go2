@@ -372,7 +372,8 @@ body.access-mode { padding-bottom: 0 !important; }
 #view-scanner #reader.is-active::after { opacity: 1; animation: scanLine 2.2s ease-in-out infinite; }
 .scan-align-hint { text-align: center; margin: 0 0 4px; }
 .scan-align-hint[hidden] { display: none !important; }
-#view-scanner .scanner-idle-hint { text-align: center; margin: 6px 0 8px; }
+#view-scanner .scanner-card > h2 { margin: 0 0 6px; }
+#view-scanner .scanner-idle-hint { text-align: center; margin: 2px 0 10px; }
 #view-scanner .scanner-idle-hint[hidden] { display: none !important; }
 #view-scanner .scanner-actions .btn-primary, #view-scanner .scanner-actions .btn-ghost { transition: opacity .25s ease, filter .25s ease, transform .15s ease; }
 #view-scanner #btnStartCamera:disabled, #view-scanner #btnStopCamera:disabled { opacity: .55; }
