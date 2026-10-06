@@ -526,3 +526,63 @@ En móvil se veían los 3 botones; en escritorio el tercero parecía desaparecer
 | Comportamiento intacto: `enterDemo()` reutilizada, directo al dashboard sin login/registro/cuenta/credenciales; visible solo en bienvenida y oculto con login/registro/dashboard por `.hero-auth[hidden]` existente; `Volver/Salir` lo recuperan | `app.js` |
 
 **Verificación:** bienvenida con exactamente 3 botones alineados a `100% / max 420px / min 52px / gap 12px` sin salirse del panel; demo abre dashboard con nav/TOBI; `Salir` recupera los 3; móvil intacto; sin scroll-x ni errores.
+
+---
+
+## 32. 🔍 Diagnóstico HTTPS + cámara trasera del lector (solo `app.js`)
+
+Sin cambiar de librería todavía. El lector no explicaba por qué la cámara no abría por IP local HTTP.
+
+| Cambio | Dónde |
+|--------|-------|
+| Diagnóstico previo `getScannerDiagnosis()` (solo lectura: `isSecureContext`, `mediaDevices`, `getUserMedia`, global de librería, flag de fallo CDN) + `classifyScannerError()` (permiso rechazado, cámara en uso, sin cámara) | `app.js` |
+| En origen HTTP inseguro no se intenta abrir la cámara; `#scannerStatus` muestra el mensaje HTTPS y el ingreso manual sigue activo; el fallo CDN conserva su propio mensaje sin confundirse | `app.js` (`startCamera`) |
+| Cámara trasera preferente `facingMode: { ideal: "environment" }` (sin `exact`), `fps: 10`, sin auto-apertura, permiso solo en `Activar cámara`, una sola instancia con botón deshabilitado durante la inicialización | `app.js` |
+| `scanT0` inicia al quedar preparado el lector y el tiempo real se muestra en `#scanResult` | `app.js` |
+
+**Verificación:** `node --check` OK; HTTP local → mensaje HTTPS; CDN caído → mensaje propio; sin `getUserMedia()` directo como lector; manual intacto.
+
+---
+
+## 33. 📏 Estabilidad EAN-13 con doble lectura (solo `app.js` + textos)
+
+Las lecturas a distancia variaban dígitos y se procesaban valores inestables.
+
+| Cambio | Dónde |
+|--------|-------|
+| Normalización a string (`trim` + sin espacios/guiones/saltos), conserva ceros, sin `Number`, sin autocorrección, sin parciales; numérico 6–14 dígitos; EAN-13 con dígito verificador (los 14 códigos registrados se aceptan tras doble lectura) | `app.js` (`normalizeScanText/isNumericCode/isValidEan13/isRegisteredCode`) |
+| Candidato + contador: dos detecciones idénticas en `1800 ms` para aceptar; reinicio si cambia un dígito; sin aviso de “no encontrado” antes de confirmar; procesado único (`scanProcessing` + último confirmado 3000 ms) | `app.js` (`onScanSuccess`) |
+| Registrado exacto → `onScannedCode()` + `addToCart(code, 1)` una vez + `Producto agregado: [nombre]` + detención; desconocido → `Código leído correctamente, pero no registrado: [código]`, sin agregar | `app.js` (`onScannedCode`) |
+| `qrbox` función responsive (~85% ancho, ~3:1) y zoom moderado solo si el track lo admite | `app.js` |
+
+**Verificación:** `node --check` OK; una lectura agrega una sola unidad; manual reutiliza `onScannedCode()`.
+
+---
+
+## 34. 🔄 Migración del lector a Quagga2 (adiós interfaz QR)
+
+`Html5QrcodeScanner` generaba `Select Camera`, `Stop Scanning`, marco cuadrado QR y visor vertical. Se eliminó `html5-qrcode` del código activo (sin ocultar con CSS) y se usa solo Quagga2 1D.
+
+| Cambio | Dónde |
+|--------|-------|
+| Eliminado CDN `https://unpkg.com/html5-qrcode` (`html5qrcode-cdn`); añadido único CDN `https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js` (`quagga2-cdn`); sin npm ni copia local | `index.html` |
+| Eliminadas referencias activas a `Html5QrcodeScanner`, `Html5Qrcode`, `Html5QrcodeSupportedFormats` en `index.html`/`app.js` (cero coincidencias) | `index.html`, `app.js` |
+| `buildQuaggaConfig()`: `LiveStream` en `#reader`, `facingMode: environment`, `locate: true`, `frequency: 10`, lectores `ean_reader, ean_8_reader, upc_reader, upc_e_reader, code_128_reader` (sin QR) | `app.js` |
+| `Activar cámara` → `Quagga.init()` + `Quagga.start()`; `Detener` → `Quagga.stop()` + `offDetected()` + vaciado de `#reader` + botones restablecidos; un solo `onDetected` (`ensure/detach`, sin duplicados) | `app.js` |
+
+**Verificación:** `node --check` OK; `new window.Html5Qrcode*` inexistente; un `.onDetected(`; manual intacto; `PRODUCTS` y 14 códigos intactos.
+
+---
+
+## 35. ↔️ Visor horizontal Quagga2 con guía propia (solo `app.js` + `index.html` + `styles.css`)
+
+El visor debía dejar de parecer un lector QR.
+
+| Cambio | Dónde |
+|--------|-------|
+| `#reader`: `width 100%`, `height 260px`, `max-height 300px`, `aspect-ratio 4/3`, `radius 16px`, `#111`, `relative`, `overflow hidden`; video/canvas Quagga2 al 100% con `object-fit: cover` absoluto | `styles.css` |
+| Guía propia `::before` (85% × 90px ≈3:1, borde blanco 3px, `pointer-events: none`) + línea central `::after` (verde); sin esquinas QR; texto externo `Alinea todas las barras dentro del rectángulo`; ingreso manual debajo | `styles.css`, `index.html` |
+| Área de detección central `top 35% / right 8% / bottom 35% / left 8%` (franja horizontal ~84% × 30%) | `app.js` (`buildQuaggaConfig`) |
+| Textos: título `Lector de código de barras` (sin emoji), instrucción de marco horizontal, ayuda 15–25 cm, activo `Cámara activa. Alinea las barras dentro del rectángulo.` | `index.html`, `app.js` |
+
+**Verificación:** marco 272×90 (320px) a 366×90+ (430px); sin `Select Camera`/`Stop Scanning`; video sin deformar; `320–430px` sin scroll-x.

@@ -442,7 +442,7 @@ const SCANNER_STARTED_MSG = "Cámara activa. Alinea las barras dentro del rectá
 const SCANNER_READY_MSG = "Cámara lista. Mantén el código horizontal y estable.";
 const SCANNER_UNSTABLE_MSG = "Lectura inestable. Mantén el código quieto y bien iluminado.";
 const SCANNER_DETECTED_MSG = "Código detectado.";
-const SCANNER_UNKNOWN_MSG = "Código leído correctamente, pero no registrado:";
+const SCANNER_UNKNOWN_MSG = "Código de barras no registrado:";
 const SCANNER_ADDED_MSG = "Producto agregado:";
 const SCANNER_BUSY_MSG = "La cámara está siendo utilizada por otra aplicación.";
 const SCANNER_EXTERNAL_MSG = "El lector externo no está disponible. Usa el ingreso manual.";
@@ -823,7 +823,7 @@ function onScannedCode(rawCode) {
   const perf = dt ? ` <span class="perf-hint">⏱️ ${dt.toFixed(1)}s (meta &lt;3s ${dt < 3 ? "✅" : "⚠️"})</span>` : "";
   const prod = PRODUCTS.find((p) => p.code === code);
   if (!prod) {
-    $("scanResult").innerHTML = SCANNER_UNKNOWN_MSG + " " + code.replace(/</g, "&lt;") + perf;
+    $("scanResult").textContent = SCANNER_UNKNOWN_MSG + " " + code;
     beep(false);
     scanT0 = 0;
     return;

@@ -13,7 +13,7 @@
 
 | ID | Objetivo | Estado |
 |----|----------|--------|
-| O1 | Lector de código de barras desde el celular | ✅ `Html5QrcodeScanner` (CDN `html5-qrcode`) + ingreso manual con degradación |
+| O1 | Lector de código de barras desde el celular | ✅ Quagga2 (CDN `@ericblade/quagga2`) + ingreso manual con degradación |
 | O2 | Carrito virtual (máx. 40 productos, compra rápida) | ✅ `MAX_ITEMS=40` con barra de progreso, bloqueo y modal a caja tradicional |
 | O15 | RN-CAJA-RÁPIDA: tope 40 + modal bloqueante | ✅ `isFastLimitReached/showFastLimitModal` + `#fastLimitModal` responsive; validación+render+total <2s |
 | O3 | IGV 18 % desglosado (precios incluyen IGV) | ✅ `Subtotal = Total / 1.18` |
@@ -38,8 +38,8 @@
 └──────┬──────┘                      └──────────┘                   │ tottus_order │
        │ CSS verde/blanco + animaciones        ▲ cámara + QR        │ tottus_history│
        ▼                                       │                   └──────────────┘
-┌─────────────┐   html5-qrcode (CDN)  ┌───────────────────┐   qrcode@1.5.3 (CDN)
-│ styles.css  │   Html5QrcodeScanner ──►│ #reader + #scanner │ ◄── con fallback offline
+┌─────────────┐   Quagga2 (CDN)  ┌───────────────────┐   qrcode@1.5.3 (CDN)
+│ styles.css  │   onDetected ──►│ #reader + #scanner │ ◄── con fallback offline
 └─────────────┘   render/clear        │ status/manual     │   (QRs de pago) + manifest.json + sw.js (PWA)
 ```
 
@@ -50,9 +50,9 @@
 
 | Archivo | Rol | Contenido clave |
 |---------|-----|-----------------|
-| `index.html` | Estructura + 5 vistas + nav inferior | header, search-bar, `#view-login/home/scanner/cart/checkout`, `#reader`, `#scannerStatus`, `#btnStartCamera/#btnStopCamera`, `#manualCode/#btnManualAdd`, `#codesList`, `#scanResult`, `loginDNI/loginBirth`, `#cardForm`, `#historyCard`, `#payTimerHint`, `#fastLimitModal`, `#qrCajaCanvas`, `#qrSalidaCanvas`, inputs `cajaInput/segInput`, `manifest.json` + `qrcode@1.5.3` + `#html5qrcode-cdn` (`https://unpkg.com/html5-qrcode`) + `app.js` |
+| `index.html` | Estructura + 5 vistas + nav inferior | header, search-bar, `#view-login/home/scanner/cart/checkout`, `#reader`, `#scannerStatus`, `#btnStartCamera/#btnStopCamera`, `#manualCode/#btnManualAdd`, `#codesList`, `#scanResult`, `loginDNI/loginBirth`, `#cardForm`, `#historyCard`, `#payTimerHint`, `#fastLimitModal`, `#qrCajaCanvas`, `#qrSalidaCanvas`, inputs `cajaInput/segInput`, `manifest.json` + `qrcode@1.5.3` + `#quagga2-cdn` (`https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js`) + `app.js` |
 | `styles.css` | Diseño mobile-first verde/blanco | variables CSS, animaciones, `.restricted-tag`, `.perf-hint`, `.card-form`, `.hist-list`, `.modal-overlay/.modal-card` responsive, `.scanner-viewport/.scanner-status/.scanner-actions/.scan-result/.codes-list`, estado `:disabled` de botones del escáner, TOBI, confeti, `@media print` (solo ticket) |
-| `app.js` | Lógica de negocio | catálogo 14, `calcAge/isAdultUser`, `MAX_ITEMS=40`, `isFastLimitReached/showFastLimitModal`, `scanT0/payT0`, `ORDER_KEY/HISTORY_KEY`, `saveOrder/restoreOrderUI`, `beep()`, escáner `isScannerLibAvailable/updateScannerAvailability/SCANNER_UNAVAILABLE_MSG/startCamera/stopCamera/onScanSuccess/onScanFailure/onScannedCode/renderCodesHelp` (`window._html5QrcodeScanner`, `scannerRunning`, `window.__html5QrcodeCdnFailed`), validación tarjeta, checkout por pasos, TOBI, confeti |
+| `app.js` | Lógica de negocio | catálogo 14, `calcAge/isAdultUser`, `MAX_ITEMS=40`, `isFastLimitReached/showFastLimitModal`, `scanT0/payT0`, `ORDER_KEY/HISTORY_KEY`, `saveOrder/restoreOrderUI`, `beep()`, escáner Quagga2 `isScannerLibAvailable/updateScannerAvailability/SCANNER_UNAVAILABLE_MSG/startCamera/stopCamera/onScanSuccess/handleQuaggaDetected/onScannedCode/renderCodesHelp` (`window._quaggaRunning`, `scannerRunning`, `window.__quaggaCdnFailed`, `window._quaggaDetectedBound`), validación tarjeta, checkout por pasos, TOBI, confeti |
 | `manifest.json` + `sw.js` | PWA mínima | manifest instalable + SW cache-first html/css/js |
 
 ## 4. Funcionalidades detalladas
@@ -87,6 +87,18 @@
 - **Perf RNF02:** `scanT0 = performance.now()` al iniciar cámara o al pulsar manual; `onScannedCode()` muestra `⏱️ Xs (meta <3s ✅/⚠️)` discreto en verde (`.perf-hint`) + `beep()` (880Hz ok / 220Hz error).
 - **Intercepción tope 40:** `onScannedCode()` valida `isFastLimitReached(1)` antes de `addToCart()`; si es el artículo 41 muestra `⛔ Límite de 40 alcanzado` + abre `#fastLimitModal` y no inserta.
 - Nota histórica: la implementación anterior basada en `BarcodeDetector` + `getUserMedia()` directo (sondeo ~400 ms) fue reemplazada por `Html5QrcodeScanner`; ya no es la vía vigente.
+
+### 4.3b Lector Quagga2 horizontal (vigente desde 2026-10-06; reemplaza 4.3)
+- **Motivo:** `Html5QrcodeScanner` generaba su propia interfaz (`Select Camera`, `Stop Scanning`, marco cuadrado QR, visor vertical). Se eliminó `html5-qrcode` (CDN `https://unpkg.com/html5-qrcode`, `Html5QrcodeScanner`, `Html5Qrcode`, `Html5QrcodeSupportedFormats`) y se migró a **Quagga2** (`window.Quagga`), especializado en barras 1D y sin interfaz automática.
+- **Carga (sin copia local, sin npm):** `index.html` carga `<script id="quagga2-cdn" src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js" onerror="window.__quaggaCdnFailed=true">` antes de `app.js`. `isScannerLibAvailable()` retorna `false` si `window.__quaggaCdnFailed` o si `typeof window.Quagga === "undefined"`.
+- **Diagnóstico HTTPS (Fase 1, intacto):** `getScannerDiagnosis()` solo lee `window.isSecureContext`, `navigator.mediaDevices`, `getUserMedia`, `window.Quagga`, `window.__quaggaCdnFailed`. Con `isSecureContext === false` no se abre la cámara y `#scannerStatus` muestra el mensaje HTTPS; el ingreso manual sigue activo. `classifyScannerError()` distingue permiso rechazado, cámara en uso (`NotReadableError/TrackStartError`), sin cámara y fallo CDN.
+- **Configuración (`buildQuaggaConfig()`):** `inputStream { type: "LiveStream", target: #reader, constraints: { facingMode: "environment", width ≥320, height ≥240 }, area: { top: "35%", right: "8%", bottom: "35%", left: "8%" } }`, `locator { patchSize: "medium", halfSample: true }`, `decoder { readers: [ean_reader, ean_8_reader, upc_reader, upc_e_reader, code_128_reader], multiple: false }` (sin QR), `locate: true`, `frequency: 10`.
+- **Botones:** `#btnStartCamera` → `Quagga.init()` + `Quagga.start()` (permiso solo aquí, sin auto-apertura, botón deshabilitado durante la inicialización); `#btnStopCamera` → `Quagga.stop()` + `offDetected()` + vaciado de `#reader` + botones restablecidos. `showView()` y cierre de sesión invocan `stopCamera()`.
+- **Un solo listener:** `ensureQuaggaDetectedListener()` registra `handleQuaggaDetected` una sola vez (`window._quaggaDetectedBound`); `detachQuaggaDetectedListener()` lo retira con `offDetected()` al detener o confirmar.
+- **Estabilidad (dos lecturas):** `handleQuaggaDetected` extrae `result.codeResult.code` (+ `format`) y delega en `onScanSuccess()`, que normaliza a string (conserva ceros, sin `Number`, sin autocorrección), exige numérico 6–14 dígitos, valida EAN-13 de 13 dígitos (los códigos registrados del catálogo se aceptan tras doble lectura) y requiere **dos detecciones idénticas** en `1800 ms` (`scanCandidate/scanCandidateCount`); si cambia un dígito reinicia. Sin aviso de “no encontrado” antes de confirmar; el confirmado se procesa una sola vez (`scanProcessing` + `lastConfirmedCode` 3000 ms).
+- **Resultado:** registrado exacto → `onScannedCode()` → `addToCart(code, 1)` una vez + `Producto agregado: [nombre]` + detención; desconocido confirmado → `Código leído correctamente, pero no registrado: [código]`, sin agregar. `scanT0` inicia tras `start()` y el tiempo real se muestra con meta `<3s`.
+- **Visor horizontal (`styles.css`):** `#reader` 100% × 260px (`max-height: 300px`, `aspect-ratio: 4/3`, `radius: 16px`, `#111`); video/canvas Quagga2 al 100% con `object-fit: cover` absoluto; guía propia `::before` (85% × 90px ≈3:1, borde blanco 3px) + línea central `::after` (verdes, `pointer-events: none`); texto externo `Alinea todas las barras dentro del rectángulo`; ingreso manual debajo; sin scroll horizontal.
+- **Zoom:** `applyModerateZoom()` solo si el track expone `zoom` (objetivo 1.4), sin fallar ni forzar enfoque.
 
 ### 4.4 Carrito (`addToCart`, `changeQty`, `renderCart`, RN-CAJA-RÁPIDA 40)
 - Mapa `cart = {code: qty}` persistido en `tottus_cart` vía `saveState()` (retorna `false` y no guarda si `qty > 40`).
@@ -195,7 +207,7 @@ python3 -m http.server 8000
 ## 8. Limitaciones conocidas (demo)
 - Sin backend: pago, caja y seguridad son simulados; cualquiera puede pulsar “validar”. `localStorage` (`tottus_cart/order/history/user`) es manipulable; en producción usar pasarela real + HMAC/JWT en servidor con nonces.
 - Firma QR demo (`simpleHash` + secreto en cliente); tarjeta demo solo valida formato.
-- Escáner `html5-qrcode` exclusivamente por CDN (`https://unpkg.com/html5-qrcode`, sin copia local ni npm): requiere internet y permiso de cámara; si el CDN falla, el escaneo se deshabilita con el aviso en `#scannerStatus` y se continúa por ingreso manual (`#manualCode/#btnManualAdd`) + `beep()`. El SW cachea el app shell, no el CDN.
+- Escáner Quagga2 exclusivamente por CDN (`https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js`, sin copia local ni npm): requiere internet y permiso de cámara; si el CDN falla, el escaneo se deshabilita con el aviso en `#scannerStatus` y se continúa por ingreso manual (`#manualCode/#btnManualAdd`) + `beep()`. El SW cachea el app shell, no el CDN.
 - QR de pago por CDN (`qrcode@1.5.3`) requiere internet; sin él solo placeholder (`fallbackQR()`). SW cachea app shell, no los CDN.
 
 ## 9. Trabajo futuro
@@ -217,7 +229,7 @@ python3 -m http.server 8000
 4. Reúso: validar caja dos veces → “QR ya usado”.
 5. Código erróneo de cajero/seguridad → “incorrecto”.
 6. Recargar a mitad del flujo: carrito persiste en `tottus_cart` y `order` persiste en `tottus_order` con QR redibujado (ya no se pierde).
-7. Fallback del lector: con CDN disponible `#btnStartCamera/#btnStopCamera` habilitados y `#manualCode/#btnManualAdd` operativo; simulando CDN caído (`window.__html5QrcodeCdnFailed = true` o bloqueo de `https://unpkg.com/html5-qrcode`), `#scannerStatus` muestra “El escáner no está disponible. Puedes ingresar el código manualmente.”, los botones de cámara quedan `disabled`, el ingreso manual sigue agregando y el catálogo/carrito/TOBI no se afectan.
+7. Fallback del lector: con CDN disponible `#btnStartCamera/#btnStopCamera` habilitados y `#manualCode/#btnManualAdd` operativo; simulando CDN caído (`window.__quaggaCdnFailed = true` o bloqueo de `https://cdn.jsdelivr.net/npm/@ericblade/quagga2`), `#scannerStatus` muestra “El escáner no está disponible. Puedes ingresar el código manualmente.”, los botones de cámara quedan `disabled`, el ingreso manual sigue agregando y el catálogo/carrito/TOBI no se afectan.
 
 ## Historial de cambios técnicos
 
@@ -235,3 +247,10 @@ python3 -m http.server 8000
 - Se eliminaron el botón “Comenzar compra” (`href="#loginForm"`) y la tarjeta blanca de beneficios; cada formulario se abre solo por JS en la misma pantalla (login `#loginCard`, registro `#loginForm`), sin redirigir ni recargar.
 - Corrección de visibilidad inicial: `.auth-card { display:grid }` vencía al atributo `hidden`; se añadieron reglas `#loginCard[hidden]` / `#loginForm[hidden] { display:none !important }` y limpieza del hash (`#loginForm`/`#registerForm`) con `history.replaceState` al iniciar y al volver.
 - Logotipos: `img/Logo_Tottus.png` (320×320 con 135 px transparentes arriba/abajo, 0 píxeles blancos; el blanco era solo CSS) → recorte `img/Logo_Tottus-cropped.png` (304×66) → variante blanca `img/Logo_Tottus-blanco.png` (verdes a blanco, amarillos conservados). Bienvenida usa la variante blanca sin fondos/cápsulas (`190px/65vw`, `170px` móvil, `200px` escritorio); cabecera conserva el original.
+
+### Migración del lector a Quagga2 horizontal (2026-10-06)
+- Diagnóstico HTTPS: `getScannerDiagnosis()` + `classifyScannerError()` (mensajes HTTPS/CDN/permiso/sin cámara/cámara en uso); en HTTP local no se abre la cámara y el ingreso manual sigue activo.
+- Cámara trasera preferente (`facingMode: environment`, `fps: 10`), sin auto-apertura, una sola instancia, `scanT0` real con meta `<3s`.
+- Estabilidad EAN: normalización a string, doble lectura idéntica (`1800 ms`), validación EAN-13, procesamiento único, mensajes `Producto agregado: [nombre]` / `Código leído correctamente, pero no registrado: [código]`.
+- Reemplazo total de `html5-qrcode` por Quagga2 (`quagga2-cdn`, `Quagga.init/start/stop`, un `onDetected` + `offDetected`); visor `#reader` 100% × 260px con guía 85% × 90px y área central `35%/8%/35%/8%`.
+- `node --check app.js` OK; cero referencias activas a `Html5Qrcode*` en `index.html`/`app.js`.
