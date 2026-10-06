@@ -395,6 +395,10 @@ function showView(name) {
   document.querySelectorAll(".bottom-nav button").forEach(b =>
     b.classList.toggle("active", b.dataset.nav === name));
   if (name !== "scanner") stopCamera();
+  if (name === "scanner" && !scannerRunning && !scannerInitializing) {
+    setScannerVisual(false);
+    updateScannerAvailability();
+  }
   if ((getUser() || demoMode) && name !== "login") botGuideView(name);
   window.scrollTo({ top: 0 });
 }
@@ -446,6 +450,7 @@ const SCANNER_UNKNOWN_MSG = "Código de barras no registrado:";
 const SCANNER_ADDED_MSG = "Producto agregado:";
 const SCANNER_BUSY_MSG = "La cámara está siendo utilizada por otra aplicación.";
 const SCANNER_EXTERNAL_MSG = "El lector externo no está disponible. Usa el ingreso manual.";
+const SCANNER_STARTING_MSG = "Iniciando cámara...";
 let scannerInitializing = false;
 let scanCandidate = "";
 let scanCandidateAt = 0;
@@ -554,6 +559,22 @@ function detachQuaggaDetectedListener() {
   } catch { /* noop */ }
   window._quaggaDetectedBound = false;
 }
+// Estado visual del lector (solo presentación): el visor, el marco y la línea
+// verde existen únicamente con la cámara activa. No altera la instancia Quagga.
+function setScannerVisual(active) {
+  const readerEl = $("reader");
+  const alignHint = $("scanAlignHint");
+  const idleHint = $("scannerIdleHint");
+  if (active) {
+    if (readerEl) { readerEl.hidden = false; void readerEl.offsetWidth; readerEl.classList.add("is-active"); }
+    if (alignHint) alignHint.hidden = false;
+    if (idleHint) idleHint.hidden = true;
+  } else {
+    if (readerEl) { readerEl.classList.remove("is-active"); readerEl.hidden = true; }
+    if (alignHint) alignHint.hidden = true;
+    if (idleHint) idleHint.hidden = false;
+  }
+}
 // Zoom moderado solo si el track lo admite. Nunca falla ni fuerza enfoque.
 function applyModerateZoom() {
   try {
@@ -640,6 +661,9 @@ function onScanSuccess(decodedText, decodedResult) {
     } catch { /* noop */ }
     const btnStart = $("btnStartCamera");
     if (btnStart && isScannerLibAvailable()) btnStart.disabled = false;
+    setScannerVisual(false);
+    const btnStopAfter = $("btnStopCamera");
+    if (btnStopAfter) btnStopAfter.disabled = true;
     onScannedCode(finalCode);
   };
   if (wasRunning) {
@@ -660,8 +684,9 @@ function updateScannerAvailability() {
     // El CDN falló con el escáner activo: liberar cámara y restablecer UI sin tocar el ingreso manual.
     stopCamera();
   }
-  if (btnStart) btnStart.disabled = !available;
-  if (btnStop) btnStop.disabled = !available;
+  if (btnStart) btnStart.disabled = !available || scannerRunning || scannerInitializing;
+  if (btnStop) btnStop.disabled = !available || !scannerRunning;
+  if (!available || (!scannerRunning && !scannerInitializing)) setScannerVisual(false);
   if (!available && statusEl) statusEl.textContent = SCANNER_UNAVAILABLE_MSG;
   if (available && statusEl && !scannerRunning && (statusEl.textContent === SCANNER_UNAVAILABLE_MSG || statusEl.textContent === "Cámara detenida")) {
     statusEl.textContent = SCANNER_READY_MSG;
@@ -707,6 +732,10 @@ async function startCamera() {
     resetScanCandidate();
     scanProcessing = false;
     if (btnStart) btnStart.disabled = true;
+    const btnStopInit = $("btnStopCamera");
+    if (btnStopInit) btnStopInit.disabled = true;
+    if (statusEl) statusEl.textContent = SCANNER_STARTING_MSG;
+    setScannerVisual(false);
     ensureQuaggaDetectedListener();
     window.Quagga.init(buildQuaggaConfig(), (initErr) => {
       if (initErr) {
@@ -747,6 +776,10 @@ async function startCamera() {
       scannerInitializing = false;
       scanT0 = performance.now();
       if (statusEl) statusEl.textContent = SCANNER_STARTED_MSG;
+      setScannerVisual(true);
+      if (btnStart) btnStart.disabled = true;
+      const btnStopOk = $("btnStopCamera");
+      if (btnStopOk) btnStopOk.disabled = false;
       setTimeout(applyModerateZoom, 1200);
     });
   } catch (e) {
@@ -793,6 +826,9 @@ async function stopCamera() {
   } catch { /* noop */ }
   const btnStart = $("btnStartCamera");
   if (btnStart && isScannerLibAvailable()) btnStart.disabled = false;
+  const btnStop = $("btnStopCamera");
+  if (btnStop) btnStop.disabled = true;
+  setScannerVisual(false);
   const st = $("scannerStatus");
   if (st && $("view-scanner").hidden === false) st.textContent = SCANNER_READY_MSG;
 }

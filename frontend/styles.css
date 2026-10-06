@@ -360,11 +360,22 @@ body.access-mode { padding-bottom: 0 !important; }
 /* Scanner: código de barras horizontal Quagga2 */
 #view-scanner { overflow-x: clip; min-width: 0; }
 .scanner-card { overflow-x: clip; min-width: 0; max-width: 100%; margin-bottom: 12px; }
+@keyframes scannerIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes scanLine { 0%, 100% { transform: translateY(-34px); } 50% { transform: translateY(34px); } }
 #reader { position: relative; width: 100%; max-width: 420px; height: 260px; aspect-ratio: 4 / 3; max-height: 300px; margin: 0 auto 8px; min-width: 0; overflow: hidden; border-radius: 16px; background: #111; }
+#view-scanner #reader[hidden] { display: none !important; }
+#view-scanner #reader.is-active { animation: scannerIn .32s ease; }
 #reader video, #reader canvas { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; display: block; border-radius: 16px; }
-#reader::before { content: ""; position: absolute; left: 7.5%; right: 7.5%; top: 50%; transform: translateY(-50%); height: 90px; border: 3px solid rgba(255, 255, 255, 0.92); border-radius: 10px; pointer-events: none; box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.35); z-index: 2; }
-#reader::after { content: ""; position: absolute; left: 10%; right: 10%; top: 50%; height: 2px; margin-top: -1px; background: rgba(109, 186, 77, 0.9); border-radius: 2px; pointer-events: none; box-shadow: 0 0 6px rgba(109,186,77,.8); z-index: 3; }
+#reader::before { content: ""; position: absolute; left: 7.5%; right: 7.5%; top: 50%; transform: translateY(-50%); height: 90px; border: 3px solid rgba(255, 255, 255, 0.92); border-radius: 10px; pointer-events: none; box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.35); z-index: 2; opacity: 0; transition: opacity .3s ease; }
+#reader::after { content: ""; position: absolute; left: 10%; right: 10%; top: 50%; height: 2px; margin-top: -1px; background: rgba(109, 186, 77, 0.9); border-radius: 2px; pointer-events: none; box-shadow: 0 0 6px rgba(109,186,77,.8); z-index: 3; opacity: 0; }
+#view-scanner #reader.is-active::before { opacity: 1; }
+#view-scanner #reader.is-active::after { opacity: 1; animation: scanLine 2.2s ease-in-out infinite; }
 .scan-align-hint { text-align: center; margin: 0 0 4px; }
+.scan-align-hint[hidden] { display: none !important; }
+#view-scanner .scanner-idle-hint { text-align: center; margin: 6px 0 8px; }
+#view-scanner .scanner-idle-hint[hidden] { display: none !important; }
+#view-scanner .scanner-actions .btn-primary, #view-scanner .scanner-actions .btn-ghost { transition: opacity .25s ease, filter .25s ease, transform .15s ease; }
+#view-scanner #btnStartCamera:disabled, #view-scanner #btnStopCamera:disabled { opacity: .55; }
 #reader__scan_region, #reader__dashboard { max-width: 100%; }
 .manual-scan { position: relative; z-index: 1; }
 #view-scanner .scanner-actions, #view-scanner .manual-scan { scroll-margin-bottom: 120px; }
