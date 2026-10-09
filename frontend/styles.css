@@ -538,6 +538,8 @@ body.access-mode { padding-bottom: 0 !important; }
 .bot-bubble.active {
   opacity: 1; pointer-events: auto; transform: scale(1);
 }
+/* Guardia: el panel oculto (y su SVG) nunca debe pintarse, ni con animaciones en curso */
+.bot-bubble[hidden] { display: none !important; }
 .bot-widget.active .bot-head,
 .bot-widget.active .bot-antenna,
 .bot-widget.active .bot-name,
@@ -557,6 +559,92 @@ body.access-mode { padding-bottom: 0 !important; }
 }
 .bot-close::after { content: ""; position: absolute; inset: -12px; }
 .bot-close:active { background: var(--green); color: #fff; }
+
+/* TOBI botón flotante: saltito + saludo en el propio robot (punto 1) */
+/* Saltito del ícono "T" (panel cerrado): llama a abrir sin molestar, cada ~7s vía JS */
+@keyframes tobi-nudge {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-7px) scale(1.04); }
+  55% { transform: translateY(0) scale(.98); }
+  75% { transform: translateY(-3px) scale(1.01); }
+}
+.bot-avatar.tobi-nudge { animation: tobi-nudge .8s ease; }
+/* Saludo al abrir: el propio Tobi se inclina (origen en la base), sonríe feliz y saluda */
+@keyframes tobi-greet-tilt {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-7deg); }
+  50% { transform: rotate(6deg); }
+  75% { transform: rotate(-4deg); }
+}
+@keyframes tobi-greet-wave {
+  0% { transform: rotate(-24deg); }
+  25% { transform: rotate(26deg); }
+  50% { transform: rotate(-16deg); }
+  75% { transform: rotate(20deg); }
+  100% { transform: rotate(-8deg); }
+}
+/* Brazo del robot: parte de Tobi, solo visible durante el saludo */
+.tobi-greet-arm {
+  position: absolute;
+  right: -3px;
+  bottom: 24px;
+  width: 12px;
+  height: 26px;
+  background: linear-gradient(180deg, #fff, var(--green-soft));
+  border: 2px solid var(--green-deep);
+  border-radius: 999px;
+  transform-origin: 50% 12%;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0);
+}
+.tobi-greet-arm::after {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: 2px solid var(--green-deep);
+  border-radius: 50%;
+}
+.bot-avatar.tobi-greet {
+  transform-origin: 50% 100%;
+  animation: tobi-greet-tilt 1s ease-in-out 2;
+}
+/* El saludo manda sobre el meneo corto de mensaje nuevo */
+.bot-avatar.tobi-greet.talking { animation: tobi-greet-tilt 1s ease-in-out 2; }
+.bot-avatar.tobi-greet .tobi-greet-arm {
+  opacity: 1;
+  transform: scale(1);
+  animation: tobi-greet-wave 1s ease-in-out 2;
+}
+/* Cara feliz: ojos cerrados + boca abierta sonriente */
+.bot-avatar.tobi-greet .bot-eye { animation: none; transform: scaleY(.15); }
+.bot-avatar.tobi-greet .bot-smile {
+  width: 20px;
+  height: 13px;
+  background: var(--green-deep);
+  border-radius: 999px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bot-avatar.tobi-nudge,
+  .bot-avatar.tobi-greet,
+  .bot-avatar.tobi-greet .tobi-greet-arm {
+    animation: none !important;
+  }
+  /* Sin movimiento: cara feliz y brazo levantado mientras el panel está abierto */
+  .bot-widget.active .bot-avatar .bot-eye { animation: none; transform: scaleY(.15); }
+  .bot-widget.active .bot-avatar .bot-smile {
+    width: 20px;
+    height: 13px;
+    background: var(--green-deep);
+    border-radius: 999px;
+  }
+  .bot-widget.active .bot-avatar .tobi-greet-arm { opacity: 1; transform: scale(1) rotate(-8deg); }
+}
 
 /* Acceso: una sola vista, transición discreta y sin solapes */
 #view-login { min-width: 0; overflow-x: clip; }
@@ -892,3 +980,189 @@ body.access-mode { padding-bottom: 0 !important; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* CHAT CON TOBI (paso 2, solo aditivo): reutiliza .card/.btn-primary/.btn-ghost */
+.tobi-chat-open { margin-top: 8px; min-height: 44px; font-size: 14px; }
+.tobi-chat-card { display: flex; flex-direction: column; gap: 10px; padding: 14px; }
+.tobi-chat-head { display: flex; align-items: center; gap: 10px; }
+.tobi-chat-back { width: auto; min-height: 44px; padding: 8px 14px; flex: none; }
+.tobi-chat-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.tobi-chat-avatar {
+  width: 38px; height: 38px; flex: none;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--green), var(--green-deep));
+  color: #fff; font-weight: 900; font-size: 18px;
+  border: 2px solid var(--green-deep); border-radius: 12px;
+}
+.tobi-chat-title strong { display: block; font-size: 15px; }
+.tobi-chat-log {
+  display: flex; flex-direction: column; gap: 8px;
+  min-height: 40vh; max-height: 52vh; overflow-y: auto;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px;
+}
+.chat-msg {
+  max-width: 82%; padding: 9px 12px; border-radius: 14px;
+  font-size: 14px; line-height: 1.45; overflow-wrap: anywhere;
+  animation: fadeSlide .2s ease;
+}
+.chat-msg.tobi {
+  align-self: flex-start; background: #fff;
+  border: 1px solid var(--green); border-radius: 14px 14px 14px 4px;
+}
+.chat-msg.user {
+  align-self: flex-end; background: var(--green); color: #fff;
+  border-radius: 14px 14px 4px 14px;
+}
+.chat-msg small { display: block; font-size: 11px; opacity: .7; margin-top: 4px; }
+.tobi-typing { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); min-height: 22px; }
+.tobi-typing[hidden] { display: none; }
+.tobi-typing span {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green); animation: tobi-typing-bounce 1s infinite;
+}
+.tobi-typing span:nth-child(2) { animation-delay: .15s; }
+.tobi-typing span:nth-child(3) { animation-delay: .3s; }
+@keyframes tobi-typing-bounce {
+  0%, 100% { transform: translateY(0); opacity: .5; }
+  50% { transform: translateY(-4px); opacity: 1; }
+}
+.tobi-typing em { font-style: italic; margin-left: 4px; }
+.tobi-chat-form { display: flex; gap: 8px; }
+.tobi-chat-form input {
+  flex: 1; min-width: 0; min-height: 48px; padding: 12px 13px;
+  border-radius: 12px; border: 1px solid var(--border);
+  font-size: 16px; background: #fff; color: var(--text);
+}
+.tobi-chat-form input:focus { border-color: var(--green); outline: 2px solid rgba(64, 166, 41, 0.35); outline-offset: 0; }
+.tobi-chat-send { width: auto; min-height: 48px; padding: 12px 18px; flex: none; }
+@media (min-width: 1024px) {
+  .tobi-chat-log { max-height: 60vh; }
+}
+
+/* HISTORIAL DEL CHAT (paso 3A, solo aditivo): paleta y tarjetas actuales */
+.tobi-history-toggle { width: auto; min-height: 44px; padding: 8px 14px; flex: none; margin-left: auto; }
+.tobi-history-panel {
+  display: grid; gap: 8px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px;
+}
+.tobi-history-panel[hidden] { display: none; }
+.tobi-history-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.tobi-history-new, .tobi-history-clear { width: auto; min-height: 44px; padding: 8px 14px; font-size: 13px; flex: 1; white-space: nowrap; }
+.tobi-history-list { display: grid; gap: 6px; max-height: 30vh; overflow-y: auto; }
+.tobi-history-item {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center;
+  text-align: left; background: #fff; border: 1px solid var(--green);
+  border-radius: 12px; padding: 9px 12px; cursor: pointer; font-size: 14px; color: var(--text);
+}
+.tobi-history-item.current { background: var(--green-soft); }
+.tobi-history-item b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tobi-history-item small { color: var(--muted); font-size: 12px; grid-column: 1; }
+.tobi-history-del { grid-row: 1 / span 2; grid-column: 2; font-size: 17px; padding: 8px; border-radius: 10px; }
+.tobi-history-del:active { background: var(--green-soft); }
+
+/* ALERGIAS (paso 4, solo aditivo): reutiliza tarjetas y botones actuales */
+.tobi-allergy-toggle { width: auto; min-height: 44px; padding: 8px 14px; flex: none; }
+.tobi-chat-head { flex-wrap: wrap; }
+.tobi-allergy-panel {
+  display: grid; gap: 8px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px;
+}
+.tobi-allergy-panel[hidden] { display: none; }
+.tobi-allergy-addrow { display: flex; gap: 8px; }
+.tobi-allergy-addrow input {
+  flex: 1; min-width: 0; min-height: 48px; padding: 12px 13px;
+  border-radius: 12px; border: 1px solid var(--border);
+  font-size: 16px; background: #fff; color: var(--text);
+}
+.tobi-allergy-addrow input:focus { border-color: var(--green); outline: 2px solid rgba(64, 166, 41, 0.35); outline-offset: 0; }
+.tobi-allergy-item {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 4px; align-items: center;
+  background: #fff; border: 1px solid var(--green);
+  border-radius: 12px; padding: 9px 12px; font-size: 14px;
+}
+.tobi-allergy-item b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tobi-allergy-item input {
+  min-height: 44px; padding: 8px 10px; border-radius: 10px;
+  border: 1px solid var(--green); font-size: 14px; min-width: 0;
+}
+.tobi-allergy-edit, .tobi-allergy-del {
+  border: none; background: none; font-size: 17px; cursor: pointer;
+  padding: 8px; border-radius: 10px; min-height: 44px;
+}
+.tobi-allergy-edit:active, .tobi-allergy-del:active { background: var(--green-soft); }
+/* Respuesta rápida del chat: botones discretos en verde actual */
+.tobi-chips { display: flex; flex-wrap: wrap; gap: 6px; align-self: flex-start; max-width: 100%; }
+.tobi-chip {
+  border: 1px solid var(--green); background: #fff; color: var(--green-dark);
+  border-radius: 999px; padding: 9px 14px; min-height: 44px;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.tobi-chip:active { background: var(--green); color: #fff; }
+.tobi-chip:disabled { opacity: .55; }
+
+/* SUGERENCIAS RÁPIDAS (paso 8.4, solo aditivo): fila discreta con scroll */
+.tobi-suggest { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 4px; }
+.tobi-suggest[hidden] { display: none; }
+.tobi-suggest .tobi-chip { flex: none; white-space: nowrap; }
+
+/* RECETAS (paso 6, solo aditivo): feed de tarjetas + detalle + aviso fijo */
+.tobi-recipe-excluded {
+  margin: 0; font-size: 13px; font-weight: 700; color: var(--green-dark);
+  background: var(--green-soft); border-radius: 10px; padding: 8px 12px;
+}
+.tobi-recipe-feed { display: grid; gap: 8px; max-height: 40vh; overflow-y: auto; }
+.tobi-recipe-card {
+  display: grid; gap: 2px; text-align: left;
+  background: #fff; border: 1px solid var(--green);
+  border-radius: 12px; padding: 10px 12px; cursor: pointer;
+  font-size: 14px; color: var(--text);
+}
+.tobi-recipe-card b { font-size: 15px; }
+.tobi-recipe-card small { color: var(--muted); font-size: 12px; }
+.tobi-recipe-have { color: var(--green-dark) !important; font-weight: 700; }
+.tobi-recipe-detail { display: grid; gap: 6px; max-height: 44vh; overflow-y: auto; }
+.tobi-recipe-detail[hidden] { display: none; }
+.tobi-recipe-detail h4 { margin: 4px 0 0; font-size: 16px; }
+.tobi-recipe-detail p { margin: 0; }
+.tobi-recipe-ings, .tobi-recipe-steps { margin: 0; padding-left: 20px; font-size: 14px; display: grid; gap: 4px; }
+.tobi-recipe-ings .have { color: var(--green-dark); font-weight: 700; }
+.tobi-recipe-disclaimer {
+  position: sticky; bottom: 0; margin: 0;
+  font-size: 12px; line-height: 1.5; color: var(--text);
+  background: var(--yellow-soft); border: 2px dashed var(--green);
+  border-radius: 12px; padding: 9px 11px;
+}
+
+/* OFERTAS (paso 7, solo aditivo): reutiliza tarjetas del feed de recetas */
+.tobi-product-flash {
+  outline: 3px solid var(--green);
+  outline-offset: 3px;
+  border-radius: 16px;
+}
+
+/* ALERTA DE ALÉRGENOS EN CATÁLOGO (paso 8.2, solo aditivo): etiqueta discreta */
+.tobi-allergen-badge {
+  display: inline-block;
+  font-size: 11px; font-weight: 800; color: var(--green-dark);
+  background: var(--yellow-soft); border: 1px solid var(--green);
+  border-radius: 999px; padding: 3px 10px; margin-bottom: 4px;
+}
+
+/* LISTA DE COMPRAS (paso 8.3, solo aditivo): reutiliza filas del historial */
+.tobi-shopping-item {
+  display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center;
+  background: #fff; border: 1px solid var(--green);
+  border-radius: 12px; padding: 9px 12px; font-size: 14px;
+}
+.tobi-shopping-item input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--green); }
+.tobi-shopping-item b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tobi-shopping-item.done b { text-decoration: line-through; opacity: .6; }
+.tobi-shopping-go {
+  border: 1px solid var(--green); background: #fff; color: var(--green-dark);
+  border-radius: 999px; padding: 8px 12px; min-height: 44px;
+  font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.tobi-shopping-go:active { background: var(--green); color: #fff; }

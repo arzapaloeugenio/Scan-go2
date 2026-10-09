@@ -897,9 +897,16 @@ function botSay(html, keepMs = 11000) {
   clearInterval(botTypeTimer);
   // Estado base colapsado: actualiza el texto en segundo plano sin expandir el robot.
   // Solo el click del usuario (botWidget/botAvatar) controla la clase active.
+  // Sin meneo con el panel cerrado (nada de animación al cargar) ni con reduced-motion.
   av.classList.remove("talking");
-  void av.offsetWidth;
-  av.classList.add("talking");
+  try {
+    const panelOpen = document.getElementById("botWidget")?.classList.contains("active");
+    const calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (panelOpen && !calm) {
+      void av.offsetWidth;
+      av.classList.add("talking");
+    }
+  } catch { /* texto intacto, sin animación */ }
   // Efecto "escribiendo": se tipea el texto plano y al final se pinta el HTML completo
   const plain = html.replace(/<[^>]+>/g, "");
   let i = 0;
@@ -920,10 +927,75 @@ function botSay(html, keepMs = 11000) {
 function botClose() {
   const b = $("botBubble");
   const w = $("botWidget");
+  const av = $("botAvatar");
   if (b) { b.classList.remove('active'); b.hidden = true; }
+  if (av) { av.classList.remove("tobi-greet"); cancelAnimationFrame(av._greetRaf); clearTimeout(av._greetTimer); }
   if (w) w.classList.remove('active');
   clearTimeout(botHideTimer);
   clearInterval(botTypeTimer);
+}
+
+// TOBI botón (punto 1, solo aditivo): el propio robot saluda al abrirse el panel.
+// No cambia textos ni la lógica de abrir/cerrar; la clase .tobi-greet se añade
+// en el momento del clic (doble rAF + reflow para reiniciar en cada apertura)
+// y se retira ~2.6s después, volviendo a la pose normal. Con prefers-reduced-motion
+// no se anima: la cara feliz + brazo se muestran por CSS mientras el panel abre.
+function tobiGreetOnOpen() {
+  try {
+    const av = $("botAvatar");
+    if (!av) return;
+    cancelAnimationFrame(av._greetRaf);
+    clearTimeout(av._greetTimer);
+    av.classList.remove("tobi-greet");
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const start = () => {
+      av.classList.remove("tobi-greet");
+      void av.offsetWidth;
+      av.classList.add("tobi-greet");
+      clearTimeout(av._greetTimer);
+      av._greetTimer = setTimeout(() => av.classList.remove("tobi-greet"), 2600);
+    };
+    if (typeof requestAnimationFrame === "function") {
+      av._greetRaf = requestAnimationFrame(() => {
+        av._greetRaf = requestAnimationFrame(start);
+      });
+    } else {
+      start();
+    }
+  } catch { /* animación opcional */ }
+}
+
+// TOBI icono "T" (panel cerrado): saltito discreto cada ~7s hasta el primer press.
+// Solo aditivo; no toca abrir/cerrar. Con prefers-reduced-motion no salta.
+function tobiNudgeOnce() {
+  try {
+    if (window._tobiPressedOnce) return;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const w = $("botWidget");
+    const av = $("botAvatar");
+    if (!w || !av) return;
+    if (w.classList.contains("active")) return;
+    if (!document.body.classList.contains("dashboard-mode")) return;
+    av.classList.remove("tobi-nudge");
+    void av.offsetWidth;
+    av.classList.add("tobi-nudge");
+    clearTimeout(av._nudgeTimer);
+    av._nudgeTimer = setTimeout(() => av.classList.remove("tobi-nudge"), 900);
+  } catch { /* opcional */ }
+}
+function tobiNudgeStart() {
+  try {
+    if (window._tobiNudgeTimer) return;
+    window._tobiNudgeTimer = setInterval(tobiNudgeOnce, 7000);
+  } catch { /* opcional */ }
+}
+
+// TOBI primer saltito: lo adelanta a unos segundos tras cargar (el intervalo
+// existente lo repite cada ~7s). Solo aditivo; no toca tobiNudgeOnce/Start.
+function tobiNudgePrimer() {
+  try {
+    setTimeout(() => { try { tobiNudgeOnce(); } catch { /* opcional */ } }, 3500);
+  } catch { /* opcional */ }
 }
 
 function firstName() {
@@ -1482,12 +1554,16 @@ function init() {
   // TOBI: apertura/cierre solo desde el cuerpo con la "T"
   document.querySelector('.bot-body').addEventListener('click', (event) => {
     event.stopPropagation();
+    window._tobiPressedOnce = true;
+    const av0 = $("botAvatar");
+    if (av0) { av0.classList.remove("tobi-nudge"); clearTimeout(av0._nudgeTimer); }
     $("botWidget").classList.toggle('active');
     const b = $("botBubble");
     if (b) {
       const isOpen = $("botWidget").classList.contains('active');
       b.hidden = !isOpen;
       b.classList.toggle('active', isOpen);
+      if (isOpen) tobiGreetOnOpen();
       if (isOpen && botLastMsg && !$("botText").textContent) botSay(botLastMsg);
     }
   });
@@ -1500,6 +1576,8 @@ function init() {
     botClose();
   });
   botSay(`👋 <b>¡Hola! Soy Tobi</b> 🤖🌿, el robot guía de Tottus. Inicia sesión o entra con la demo y yo te enseño a comprar sin hacer colas 🛒💨`);
+  tobiNudgeStart();
+  tobiNudgePrimer();
 
   document.querySelectorAll(".bottom-nav button").forEach(b => {
     b.addEventListener("click", () => {

@@ -318,6 +318,99 @@
         <button class="btn-primary" id="btnNewPurchase">Iniciar nueva compra</button>
       </div>
     </section>
+
+    <!-- VISTA: CHAT CON TOBI (paso 2, solo aditivo) -->
+    <section id="view-tobi" class="view" hidden>
+      <div class="card tobi-chat-card">
+        <div class="tobi-chat-head">
+          <button class="btn-ghost tobi-chat-back" id="btnTobiBack" type="button" aria-label="Volver a la tienda">← Volver</button>
+          <div class="tobi-chat-title">
+            <span class="tobi-chat-avatar" aria-hidden="true">T</span>
+            <div>
+              <strong>Tobi</strong>
+              <small class="muted">Asistente Tottus · en línea</small>
+            </div>
+          </div>
+          <button class="btn-ghost tobi-history-toggle" id="btnTobiHistory" type="button" aria-label="Ver historial de conversaciones">🕘 Historial</button>
+          <button class="btn-ghost tobi-allergy-toggle" id="btnTobiAllergies" type="button" aria-label="Ver mis alergias">🛡️ Mis alergias</button>
+          <button class="btn-ghost tobi-allergy-toggle" id="btnTobiFrequents" type="button" aria-label="Ver mis productos frecuentes">🛒 Mis productos</button>
+          <button class="btn-ghost tobi-allergy-toggle" id="btnTobiRecipes" type="button" aria-label="Ver recetas saludables">🍲 Recetas</button>
+          <button class="btn-ghost tobi-allergy-toggle" id="btnTobiDiscounts" type="button" aria-label="Ver descuentos de hoy">🏷️ Ofertas</button>
+          <button class="btn-ghost tobi-allergy-toggle" id="btnTobiShopping" type="button" aria-label="Ver mi lista de compras">🧾 Mi lista</button>
+        </div>
+        <div id="tobiHistoryPanel" class="tobi-history-panel" hidden>
+          <div class="tobi-history-actions">
+            <button class="btn-dark tobi-history-new" id="btnTobiNew" type="button">+ Nueva conversación</button>
+            <button class="btn-ghost tobi-history-clear" id="btnTobiClearAll" type="button">Borrar todo</button>
+          </div>
+          <p id="tobiHistoryWarn" class="muted small" hidden>⚠️ No se pudo guardar en este navegador; el chat sigue funcionando sin guardar.</p>
+          <div id="tobiHistoryList" class="tobi-history-list"></div>
+          <p id="tobiHistoryEmpty" class="muted small">Aún no tienes conversaciones. ¡Empieza una nueva! 💬</p>
+        </div>
+        <div id="tobiAllergyPanel" class="tobi-allergy-panel" hidden>
+          <div class="tobi-history-actions">
+            <button class="btn-ghost tobi-history-clear" id="btnTobiAllergyBack" type="button">← Volver al chat</button>
+            <button class="btn-ghost tobi-history-clear" id="btnTobiAllergyClear" type="button">Borrar todas</button>
+          </div>
+          <p id="tobiAllergyWarn" class="muted small" hidden>⚠️ No se pudo guardar en este navegador; el registro sigue funcionando sin guardar.</p>
+          <p id="tobiAllergyNone" class="muted small" hidden>Declaraste no tener alergias. Si eso cambia, agrégalas aquí. 💚</p>
+          <div class="tobi-allergy-addrow">
+            <input type="text" id="tobiAllergyInput" placeholder="Ej: maní" maxlength="40" aria-label="Nueva alergia" autocomplete="off" />
+            <button class="btn-dark tobi-history-new" id="btnTobiAllergyAdd" type="button">Agregar</button>
+          </div>
+          <div id="tobiAllergyList" class="tobi-history-list"></div>
+          <p id="tobiAllergyEmpty" class="muted small">Aún no registraste alergias.</p>
+        </div>
+        <div id="tobiFrequentPanel" class="tobi-allergy-panel" hidden>
+          <div class="tobi-history-actions">
+            <button class="btn-ghost tobi-history-clear" id="btnTobiFrequentBack" type="button">← Volver al chat</button>
+            <button class="btn-ghost tobi-history-clear" id="btnTobiFrequentClear" type="button">Borrar todos</button>
+          </div>
+          <p id="tobiFrequentWarn" class="muted small" hidden>⚠️ No se pudo guardar en este navegador; el registro sigue funcionando sin guardar.</p>
+          <div class="tobi-allergy-addrow">
+            <input type="text" id="tobiFrequentInput" placeholder="Ej: leche" maxlength="40" aria-label="Nuevo producto frecuente" autocomplete="off" />
+            <button class="btn-dark tobi-history-new" id="btnTobiFrequentAdd" type="button">Agregar</button>
+          </div>
+          <div id="tobiFrequentList" class="tobi-history-list"></div>
+          <p id="tobiFrequentEmpty" class="muted small">Aún no registraste productos.</p>
+        </div>
+        <div id="tobiRecipePanel" class="tobi-allergy-panel" hidden>
+          <div class="tobi-history-actions">
+            <button class="btn-ghost tobi-history-clear" id="btnTobiRecipeBack" type="button">← Volver al chat</button>
+          </div>
+          <p id="tobiRecipeExcluded" class="tobi-recipe-excluded"></p>
+          <p id="tobiRecipeUnverified" class="muted small" hidden></p>
+          <div id="tobiRecipeList" class="tobi-recipe-feed"></div>
+          <div id="tobiRecipeDetail" class="tobi-recipe-detail" hidden></div>
+          <p id="tobiRecipeEmpty" class="muted small">No encontré recetas seguras con tus datos.</p>
+          <p class="tobi-recipe-disclaimer">⚠️ Verifica siempre las etiquetas de los productos. Estas sugerencias no reemplazan la opinión de un médico o nutricionista.</p>
+        </div>
+        <div id="tobiDiscountPanel" class="tobi-allergy-panel" hidden>
+          <div class="tobi-history-actions">
+            <button class="btn-ghost tobi-history-clear" id="btnTobiDiscountBack" type="button">← Volver al chat</button>
+          </div>
+          <div id="tobiDiscountList" class="tobi-recipe-feed"></div>
+          <p id="tobiDiscountEmpty" class="muted small">Hoy no hay descuentos disponibles.</p>
+          <p class="muted small">Las ofertas pueden cambiar. Verifica el precio final en la app o en caja.</p>
+        </div>
+        <div id="tobiShoppingPanel" class="tobi-allergy-panel" hidden>
+          <div class="tobi-history-actions">
+            <button class="btn-ghost tobi-history-clear" id="btnTobiShoppingBack" type="button">← Volver al chat</button>
+            <button class="btn-ghost tobi-history-clear" id="btnTobiShoppingClear" type="button">Vaciar lista</button>
+          </div>
+          <div id="tobiShoppingList" class="tobi-history-list"></div>
+          <p id="tobiShoppingEmpty" class="muted small">Tu lista está vacía. Ármala desde una receta. 🧾</p>
+          <p class="muted small">Verifica siempre las etiquetas de los productos.</p>
+        </div>
+        <div id="tobiChatLog" class="tobi-chat-log" role="log" aria-live="polite" aria-label="Conversación con Tobi"></div>
+        <div id="tobiTyping" class="tobi-typing" hidden><span></span><span></span><span></span><em>Tobi está escribiendo...</em></div>
+        <div id="tobiSuggest" class="tobi-suggest" hidden></div>
+        <form id="tobiChatForm" class="tobi-chat-form" autocomplete="off">
+          <input type="text" id="tobiChatInput" placeholder="Escribe tu duda..." maxlength="500" aria-label="Escribe tu mensaje a Tobi" />
+          <button type="submit" class="btn-primary tobi-chat-send" aria-label="Enviar mensaje">Enviar</button>
+        </form>
+      </div>
+    </section>
   </main>
 
   <!-- BOTTOM NAV (mobile) -->
@@ -344,6 +437,7 @@
   <div class="bot-widget" id="botWidget">
     <div class="bot-bubble" id="botBubble" hidden>
       <p id="botText"></p>
+      <button class="btn-primary tobi-chat-open" id="btnTobiChat" type="button">💬 Chatear con Tobi</button>
       <button class="bot-close" id="botClose" aria-label="Cerrar mensaje">✕</button>
     </div>
     <button class="bot-avatar" id="botAvatar" aria-label="Tobi, tu asistente Tottus">
@@ -354,6 +448,7 @@
         <span class="bot-smile"></span>
       </span>
       <span class="bot-body"><i>T</i></span>
+      <span class="tobi-greet-arm" aria-hidden="true"></span>
       <span class="bot-name">TOBI</span>
     </button>
   </div>
@@ -364,5 +459,11 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script id="quagga2-cdn" src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js" onerror="window.__quaggaCdnFailed=true"></script>
   <script src="app.js"></script>
+  <script src="tobi-allergens.js"></script>
+  <script src="tobi-discounts.js"></script>
+  <script src="tobi-recipes.js"></script>
+  <script src="tobi-profile.js"></script>
+  <script src="tobi-history.js"></script>
+  <script src="tobi-chat.js"></script>
 </body>
 </html>
