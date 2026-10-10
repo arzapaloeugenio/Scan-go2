@@ -189,7 +189,34 @@ body.access-mode { padding-bottom: 0 !important; }
 }
 .hero-btn-primary { background: var(--yellow); color: var(--text); border: none; }
 .hero-btn-secondary { background: #fff; color: var(--green-dark); border: none; }
-.hero-btn-google { background: #fff; color: var(--text); border: 1px solid var(--border); }
+/* Botón Google circular: verde corporativo + borde amarillo, solo portada */
+.btn-google-circle {
+  justify-self: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2px solid var(--yellow);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  margin: 2px 0;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform .15s ease, background .2s ease, filter .2s ease;
+}
+.btn-google-circle .fa-google {
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+}
+.btn-google-circle:hover { background: var(--green-dark); border-color: var(--yellow); filter: brightness(1.05); }
+.btn-google-circle:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(63, 117, 47, .5);
+}
+.btn-google-circle:active { transform: scale(.94); filter: brightness(.96); }
 .hero-btn-tertiary { background: transparent; color: #fff; border: 1.5px solid #fff; }
 .hero-btn-tertiary:hover { background: rgba(255,255,255,.12); }
 .hero-btn-tertiary:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
@@ -782,6 +809,8 @@ body.access-mode { padding-bottom: 0 !important; }
   /* TOBI colapsado con "T", encima de la navegación */
   .bot-widget { bottom: 108px !important; right: 12px !important; }
   #view-login .main-logo { width: 170px; }
+  .btn-google-circle { width: 48px; height: 48px; }
+  .btn-google-circle .fa-google { font-size: 20px; }
   #view-login .auth-card, #view-login .login-card { padding: 16px; gap: 12px; margin-bottom: 96px; }
 }
 @media (max-width: 360px) {

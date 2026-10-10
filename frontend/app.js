@@ -1385,13 +1385,15 @@ function init() {
     $("btnDemo").addEventListener("click", enterDemo);
   }
 
-  // Continuar con Google: OAuth no configurado. Solo aviso, sin acceso ni credenciales.
-  if (!window._googleBound) {
-    window._googleBound = true;
-    const btnGoogle = $("btnGoogle");
-    if (btnGoogle) btnGoogle.addEventListener("click", () => {
-      toast("El acceso con Google estará disponible próximamente");
-    });
+  // Acceso con Google: sin integración real (sin OAuth, sin backend).
+  // Respuesta visible y controlada: no simula sesión ni crea usuario.
+  function handleGoogleAccess() {
+    toast("El acceso con Google aún no está configurado en esta demo");
+  }
+  if (!window._googleAccessBound) {
+    window._googleAccessBound = true;
+    const btnGoogleAccess = $("btnGoogleAccess");
+    if (btnGoogleAccess) btnGoogleAccess.addEventListener("click", handleGoogleAccess);
   }
 
   // Login mejorado: ver/ocultar contraseña

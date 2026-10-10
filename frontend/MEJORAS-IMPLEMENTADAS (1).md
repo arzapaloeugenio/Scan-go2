@@ -801,3 +801,39 @@ Tobi es un solo personaje: el botón flotante de la esquina inferior derecha (an
 | Scroll horizontal en celular, estilo verde actual | Sin configurar nada |
 
 **Verificación:** `prefers-reduced-motion` respeta todo lo anterior (sin movimiento); sin librerías nuevas en ninguna mejora.
+
+---
+
+## 51. 🔵 Ícono decorativo de Google en la portada (reemplazo del botón horizontal)
+
+Fase intermedia: el botón blanco horizontal “Continuar con Google” se eliminó y se colocó solo el ícono `<i class="fa-brands fa-google">` centrado encima de “Iniciar sesión” y “Probar demo”.
+
+| Cambio | Dónde |
+|--------|-------|
+| Eliminado `<button id="btnGoogle" class="hero-btn hero-btn-google">Continuar con Google</button>` de `.hero-auth`; orden: ícono, “Iniciar sesión”, “Probar demo” | `index.html` |
+| Agregada una sola CDN Font Awesome 6.5.2 (`cdnjs …/font-awesome/6.5.2/css/all.min.css`), reutilizada después sin duplicar | `index.html:9` |
+| Ícono decorativo `<i class="fa-brands fa-google hero-google-icon" aria-hidden="true">` (sin `button`/`a`, sin foco, sin acción) | `index.html` |
+| Estilo `.hero-google-icon`: centrado `justify-self:center`, `30px`, blanco sobre verde móvil y `#4285F4` solo en columna derecha blanca de escritorio 1024px+ | `styles.css` + `@media (min-width:1024px)` |
+| Eliminado bloque exclusivo `#btnGoogle` con guarda `window._googleBound` y su `toast`; eliminada clase `.hero-btn-google` | `app.js`, `styles.css` |
+| “Iniciar sesión” y “Probar demo” intactos en ancho, estilo y funcionamiento | — |
+
+**Verificación:** sin texto visible “Continuar con Google”; solo 2 botones; `node --check` OK; responsive móvil/escritorio. Estado superado por §52 (el ícono pasó a botón real).
+
+---
+
+## 52. 🔵 Botón circular de Google accesible y responsive (PC + móvil)
+
+El ícono decorativo aislado de §51 se convirtió en un `button` real, circular y compacto, con colores Scan & Go. Sin integración OAuth real.
+
+| Cambio | Dónde |
+|--------|-------|
+| `<i class="hero-google-icon">` → `<button type="button" id="btnGoogleAccess" class="btn-google-circle" aria-label="Continuar con Google"><i class="fa-brands fa-google" aria-hidden="true"></i></button>`, primero en `.hero-auth` | `index.html:51` |
+| `.btn-google-circle`: circular `52x52` (`48x48` e ícono `20px` en `≤430px`), `border-radius:50%`, `display:grid; place-items:center`, `justify-self:center`, `margin:2px 0`, `cursor:pointer`, sin ancho completo ni absolutos | `styles.css` + `@media (max-width:430px)` |
+| Colores corporativos reutilizados: fondo `var(--green)`, borde `2px solid var(--yellow)`, ícono `#fff` solo vía `.btn-google-circle .fa-google` (sin tocar la clase global de Font Awesome); hover `var(--green-dark)`; active `scale(.94)`; focus-visible con contorno `var(--yellow)` + sombra `rgba(63,117,47,.5)` | `styles.css` |
+| Sin celeste: eliminados `.hero-google-icon` y `#4285F4` (0 coincidencias); CDN Font Awesome única, sin duplicar | `styles.css`, `index.html:9` |
+| `handleGoogleAccess()` + listener único con guarda `window._googleAccessBound` sobre `#btnGoogleAccess`: solo `toast("El acceso con Google aún no está configurado en esta demo")`, sin simular sesión, sin credenciales/tokens, sin recarga | `app.js` |
+| “Iniciar sesión”, “Probar demo”, catálogo, Quagga2 y TOBI intactos | — |
+
+**Sin integración real:** falta OAuth de Google (Client ID, SDK/redirect, validación en backend y sesión). El botón es una respuesta visible controlada, no un login.
+
+**Verificación:** botón real con foco teclado (Enter/Espacio) y `aria-label`; un clic = una acción; `node --check` OK; PC conserva dos secciones con grupo centrado y `gap:12px`; `320/375/430` sin solapes ni scroll-x.
