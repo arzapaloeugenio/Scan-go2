@@ -89,6 +89,38 @@ async function cargarProductosDesdeAPI() {
   }
 }
 
+// Busca un producto por código de barras: primero en la API y, si la petición
+// falla (backend apagado o error de red), en el catálogo local de respaldo.
+// Devuelve el producto en la estructura interna o null si no existe.
+const busquedasProductoEnCurso = new Map();
+async function buscarProductoPorCodigo(codigo) {
+  const code = String(codigo == null ? "" : codigo).trim();
+  if (!code) return null;
+  // Evita solicitudes duplicadas provocadas por la misma lectura rápida.
+  if (busquedasProductoEnCurso.has(code)) return busquedasProductoEnCurso.get(code);
+  const tarea = (async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/products/${encodeURIComponent(code)}`);
+      if (response.status === 404) return null; // Respuesta definitiva: no registrado.
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const payload = await response.json();
+      const item = (payload && payload.success !== false) ? (payload.data || payload) : null;
+      const prod = normalizarProductoAPI(item);
+      if (!prod) throw new Error("respuesta inválida");
+      // Garantiza que addToCart() (sin modificar) encuentre el producto.
+      if (!PRODUCTS.some((p) => p.code === prod.code)) PRODUCTS.push(prod);
+      return prod;
+    } catch (e) {
+      // Backend apagado o petición fallida: usa el respaldo local.
+      return PRODUCTS.find((p) => p.code === code)
+        || PRODUCTOS_LOCALES.find((p) => p.code === code)
+        || null;
+    }
+  })();
+  busquedasProductoEnCurso.set(code, tarea);
+  try { return await tarea; } finally { busquedasProductoEnCurso.delete(code); }
+}
+
 const $ = (id) => document.getElementById(id);
 const money = (n) => "S/ " + n.toFixed(2);
 
@@ -892,22 +924,46 @@ async function stopCamera() {
   if (st && $("view-scanner").hidden === false) st.textContent = SCANNER_READY_MSG;
 }
 
-function onScannedCode(rawCode) {
+// Muestra el mensaje del lector reutilizando el área de estado existente
+// (#scanResult). Un mensaje de error bloquea temporalmente los mensajes de
+// error continuo del escáner para que pueda leerse con calma.
+const ESTADO_LECTOR_MS = 4000;
+let estadoLectorBloqueadoHasta = 0;
+let estadoLectorTimer = null;
+function mostrarEstadoLector(mensaje, esError = false) {
+  const el = $("scanResult");
+  if (!el) return;
+  // No sobrescribir un error visible con mensajes no-error durante su ventana.
+  if (Date.now() < estadoLectorBloqueadoHasta && !esError) return;
+  if (estadoLectorTimer) { clearTimeout(estadoLectorTimer); estadoLectorTimer = null; }
+  el.textContent = mensaje;
+  el.classList.toggle("is-error", !!esError);
+  if (esError) {
+    estadoLectorBloqueadoHasta = Date.now() + ESTADO_LECTOR_MS;
+    estadoLectorTimer = setTimeout(() => {
+      estadoLectorBloqueadoHasta = 0;
+      estadoLectorTimer = null;
+      const st = $("scanResult");
+      if (st && st.classList.contains("is-error")) {
+        st.classList.remove("is-error");
+        st.textContent = "";
+      }
+    }, ESTADO_LECTOR_MS);
+  } else {
+    estadoLectorBloqueadoHasta = 0;
+  }
+}
+
+async function onScannedCode(rawCode) {
   const code = normalizeScanText(rawCode);
   if (!code || !isNumericCode(code)) {
-    $("scanResult").textContent = SCANNER_UNSTABLE_MSG;
-    beep(false);
-    scanT0 = 0;
-    return;
-  }
-  if (code.length === 13 && !isValidEan13(code) && !isRegisteredCode(code)) {
-    $("scanResult").textContent = SCANNER_UNSTABLE_MSG;
+    mostrarEstadoLector(SCANNER_UNSTABLE_MSG);
     beep(false);
     scanT0 = 0;
     return;
   }
   if (isFastLimitReached(1)) {
-    $("scanResult").textContent = "⛔ Límite de 40 alcanzado: no se agregará el artículo 41.";
+    mostrarEstadoLector("⛔ Límite de 40 alcanzado: no se agregará el artículo 41.");
     showFastLimitModal();
     beep(false);
     scanT0 = 0;
@@ -916,17 +972,21 @@ function onScannedCode(rawCode) {
   // Tiempo real de detección con meta menor de 3 segundos, sin simulación.
   const dt = scanT0 ? ((performance.now() - scanT0) / 1000) : 0;
   const perf = dt ? ` <span class="perf-hint">⏱️ ${dt.toFixed(1)}s (meta &lt;3s ${dt < 3 ? "✅" : "⚠️"})</span>` : "";
-  const prod = PRODUCTS.find((p) => p.code === code);
+  const prod = await buscarProductoPorCodigo(code);
   if (!prod) {
-    $("scanResult").textContent = SCANNER_UNKNOWN_MSG + " " + code;
+    // Código inexistente en backend y en el respaldo local (o HTTP 404).
+    mostrarEstadoLector(SCANNER_UNKNOWN_MSG + " " + String(code).trim(), true);
     beep(false);
     scanT0 = 0;
     return;
   }
-  $("scanResult").innerHTML = SCANNER_DETECTED_MSG + " " + code.replace(/</g, "&lt;") + perf;
+  estadoLectorBloqueadoHasta = 0;
+  const resultEl = $("scanResult");
+  resultEl.classList.remove("is-error");
+  resultEl.innerHTML = SCANNER_DETECTED_MSG + " " + code.replace(/</g, "&lt;") + perf;
   const ok = addToCart(code, 1);
   beep(ok);
-  if (ok) $("scanResult").innerHTML = SCANNER_ADDED_MSG + " " + prod.name.replace(/</g, "&lt;") + perf;
+  if (ok) resultEl.innerHTML = SCANNER_ADDED_MSG + " " + prod.name.replace(/</g, "&lt;") + perf;
   scanT0 = 0;
 }
 

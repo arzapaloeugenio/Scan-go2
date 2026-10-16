@@ -420,6 +420,7 @@ body.access-mode { padding-bottom: 0 !important; }
 .manual-row { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .manual-row input { flex: 1; min-width: 0; padding: 12px; border-radius: 12px; border: 1px solid var(--border); font-family: monospace; font-size: 15px; background: #fff; }
 .scan-result { min-height: 22px; font-weight: 700; font-size: 14px; color: var(--green-dark); }
+.scan-result.is-error { color: #b71c1c; }
 .codes-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .codes-list button { font-family: monospace; font-size: 12px; padding: 10px 12px; min-height: 44px; border-radius: 8px; border: 1px dashed var(--green); background: #fff; cursor: pointer; color: var(--green-deep); max-width: 100%; }
 
