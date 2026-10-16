@@ -8,8 +8,11 @@ const MAX_ITEMS = 40;
 const QR_CAJA_TTL_SEC = 5 * 60;
 const QR_SALIDA_TTL_SEC = 3 * 60;
 const QR_SECRET = "tottus-scan-go-demo";
+// URL base del backend. Punto único de configuración de la API.
+const API_BASE_URL = "http://localhost:3000";
 
-const PRODUCTS = [
+// Catálogo local de respaldo (se conserva intacto). Se usa cuando la API no responde.
+const PRODUCTOS_LOCALES = [
   { id: 1,  name: "Leche Gloria Entera 1L", brand: "Gloria", price: 5.20, oldPrice: 5.90, code: "7750123450013", image: "img/LecheGloriaEntera1L.png", cat: "lacteos" },
   { id: 2,  name: "Pan de Molde Blanco 650g", brand: "Bimbo", price: 7.50, oldPrice: null, code: "7750123450020", image: "img/Bimbo.png", cat: "panaderia" },
   { id: 3,  name: "Arroz Superior 5kg", brand: "Costeño", price: 22.90, oldPrice: 26.90, code: "7750123450037", image: "img/Costeño.png", cat: "abarrotes" },
@@ -26,9 +29,65 @@ const PRODUCTS = [
   { id: 14, name: "Vino Tinto Borgoña 750ml", brand: "Tabernero", price: 32.50, oldPrice: null, code: "7750123450143", image: "img/Tabernero.png", cat: "licores", restricted: true },
 ];
 
-PRODUCTS.forEach(p => {
+// Catálogo activo del frontend. Inicia con el respaldo local y, si la API
+// responde correctamente, se reemplaza por los productos remotos normalizados.
+let PRODUCTS = PRODUCTOS_LOCALES.slice();
+
+PRODUCTOS_LOCALES.forEach(p => {
   p.discount = p.oldPrice ? Math.round((1 - p.price / p.oldPrice) * 100) : 0;
 });
+
+// ---------- CATÁLOGO REMOTO (Paso 2B) ----------
+// Normaliza un producto del backend a la estructura interna que ya consumen
+// renderProducts/renderCart/addToCart/onScannedCode (sin tocar esas funciones).
+function normalizarProductoAPI(item) {
+  if (!item || typeof item !== "object") return null;
+  const code = String(item.codigoBarras == null ? "" : item.codigoBarras).trim();
+  const name = String(item.nombre == null ? "" : item.nombre).trim();
+  const price = Number(item.precio);
+  if (!code || !name || !Number.isFinite(price)) return null;
+  const ant = item.precioAntiguo;
+  const oldPrice = (ant === null || ant === undefined || ant === "") ? null : Number(ant);
+  // Marca/categoría son solo de presentación; se toman del respaldo local si existen.
+  const base = PRODUCTOS_LOCALES.find((p) => p.code === code) || {};
+  const prod = {
+    code,
+    name,
+    price,
+    oldPrice: Number.isFinite(oldPrice) ? oldPrice : null,
+    image: String(item.imagen == null ? "" : item.imagen),
+    restricted: Boolean(item.restringido),
+    brand: base.brand || "",
+    cat: base.cat || "",
+  };
+  if (base.id != null) prod.id = base.id;
+  prod.discount = prod.oldPrice ? Math.round((1 - prod.price / prod.oldPrice) * 100) : 0;
+  return prod;
+}
+
+// Carga el catálogo desde GET /api/products. Ante cualquier fallo conserva el
+// respaldo local y avisa una sola vez. No permite reejecuciones innecesarias.
+let catalogoRemotoIntentado = false;
+async function cargarProductosDesdeAPI() {
+  if (catalogoRemotoIntentado) return;
+  catalogoRemotoIntentado = true;
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/products`);
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const payload = await response.json();
+    const lista = Array.isArray(payload) ? payload : (payload && payload.data);
+    if (!payload || payload.success === false || !Array.isArray(lista)) {
+      throw new Error("respuesta inválida");
+    }
+    const remotos = lista.map(normalizarProductoAPI).filter(Boolean);
+    if (!remotos.length) throw new Error("catálogo remoto vacío o inválido");
+    PRODUCTS = remotos;
+    console.log(`[catalogo] ${remotos.length} productos cargados desde la API`);
+  } catch (e) {
+    PRODUCTS = PRODUCTOS_LOCALES.slice();
+    console.warn("[catalogo] API no disponible; usando catálogo local de respaldo");
+  }
+}
 
 const $ = (id) => document.getElementById(id);
 const money = (n) => "S/ " + n.toFixed(2);
@@ -1313,9 +1372,11 @@ function validateSalida(inputCode) {
 }
 
 // ---------- INIT ----------
-function init() {
+async function init() {
   loadState();
   loadOrder();
+  // Catálogo: intenta la API y espera el resultado antes de renderizar.
+  await cargarProductosDesdeAPI();
   renderCodesHelp();
   renderAll();
   updateAuthUI();

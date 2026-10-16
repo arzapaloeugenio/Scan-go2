@@ -3,6 +3,12 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
+const productoRoutes = require('./routes/productoRoutes');
+const carritoRoutes = require('./routes/carritoRoutes');
+const ordenRoutes = require('./routes/ordenRoutes');
+const descuentoRoutes = require('./routes/descuentoRoutes');
+const historialRoutes = require('./routes/historialRoutes');
+
 const app = express();
 
 app.use(cors());
@@ -14,6 +20,15 @@ app.get('/', (req, res) => {
     message: 'Backend de Scan & Go funcionando correctamente',
   });
 });
+
+// Alias en ingles (/api/products) solicitado por el cliente; se conserva
+// el prefijo en espanol (/api/productos) para no romper endpoints existentes.
+app.use('/api/products', productoRoutes);
+app.use('/api/productos', productoRoutes);
+app.use('/api/carrito', carritoRoutes);
+app.use('/api/ordenes', ordenRoutes);
+app.use('/api/descuentos', descuentoRoutes);
+app.use('/api/historial', historialRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

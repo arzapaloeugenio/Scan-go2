@@ -2,7 +2,7 @@
 
 > Documento de trabajo: segunda iteración del proyecto **Tottus Scan & Go** (Universidad Norbert Wiener – Software 1, Proyecto Integrador).
 > Fecha: septiembre 2026 · Equipo: Arzapalo, Alva, Cabrejos, Condori · Ciclo: IS4M1.
-> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–28 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio, revisión final y visibilidad nav/TOBI solo en dashboard). **Sexta iteración (TOBI conversacional, octubre 2026):** secciones 39–50 (saludo animado y saltito, chat aparte, historial, saludo con nombre, alergias, productos frecuentes, recetas con filtro, descuentos del día, comprensión, alerta en catálogo, lista de compras y sugerencias). Todo el código se genera solo con **Opencode**.
+> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–28 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio, revisión final y visibilidad nav/TOBI solo en dashboard). **Sexta iteración (TOBI conversacional, octubre 2026):** secciones 39–50 (saludo animado y saltito, chat aparte, historial, saludo con nombre, alergias, productos frecuentes, recetas con filtro, descuentos del día, comprensión, alerta en catálogo, lista de compras y sugerencias). **Séptima iteración (backend Node/Express/PostgreSQL, octubre 2026):** secciones 53–54 documentan la API REST (modelos, controladores y rutas sobre las tablas de `backend/database/init.sql`) y la corrección de la ruta `/api/products`. Todo el código se genera solo con **Opencode**.
 
 Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 
@@ -837,3 +837,60 @@ El ícono decorativo aislado de §51 se convirtió en un `button` real, circular
 **Sin integración real:** falta OAuth de Google (Client ID, SDK/redirect, validación en backend y sesión). El botón es una respuesta visible controlada, no un login.
 
 **Verificación:** botón real con foco teclado (Enter/Espacio) y `aria-label`; un clic = una acción; `node --check` OK; PC conserva dos secciones con grupo centrado y `gap:12px`; `320/375/430` sin solapes ni scroll-x.
+
+---
+
+## 53. 🗄️ API REST del backend (Node.js + Express + PostgreSQL)
+
+Se construyó la API REST del backend a partir de las 4 tablas definidas en `backend/database/init.sql` (`cliente`, `producto`, `carrito_virtual`, `sesion_web`), usando solo `express`, `pg`, `cors` y `dotenv` (sin librerías nuevas) y la conexión compartida de `backend/config/db.js` con consultas parametrizadas (`$1`, `$2`).
+
+**Modelos** (`backend/src/models/`, uno por tabla):
+
+| Archivo | Funciones |
+|---------|-----------|
+| `clienteModel.js` | `crear`, `buscarPorId`, `buscarPorDni`, `listar` |
+| `productoModel.js` | `listar`, `buscarPorCodigo`, `listarConDescuento` |
+| `carritoModel.js` | `crear`, `buscarPorId`, `buscarActivoPorCliente`, `listarPorCliente`, `listarOrdenesPorCliente`, `actualizarMonto`, `incrementarMonto`, `actualizarEstado` |
+
+**Controladores** (`backend/src/controllers/`): `productoController.js`, `carritoController.js` (carrito + órdenes), `descuentoController.js`, `historialController.js`.
+
+**Rutas** (`backend/src/routes/`): `productoRoutes.js`, `carritoRoutes.js`, `ordenRoutes.js`, `descuentoRoutes.js`, `historialRoutes.js`.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/productos` | Lista el catálogo (`producto`) |
+| GET | `/api/productos/:codigoBarras` | Búsqueda por código de barras |
+| GET | `/api/carrito/cliente/:idCliente` | Carrito activo del cliente |
+| POST | `/api/carrito` | Crea carrito (`{ idCliente }`) |
+| GET | `/api/carrito/:id` | Carrito por id |
+| POST | `/api/carrito/:id/productos` | Agrega producto (`{ codigoBarras, cantidad }`) |
+| DELETE | `/api/carrito/:id/productos/:codigoBarras` | Quita producto (`?cantidad=`) |
+| PUT | `/api/carrito/:id/confirmar` | Checkout / estado final |
+| GET | `/api/ordenes/cliente/:idCliente` | Órdenes del cliente (§ estado ≠ `activo`) |
+| GET | `/api/ordenes/:id` | Orden por id |
+| GET | `/api/descuentos` | Productos con `precio_antiguo > precio` |
+| GET | `/api/historial/cliente/:idCliente` | Historial (carritos no activos) |
+
+**Notas de diseño (limitaciones del esquema):** no existe tabla de líneas de detalle del carrito, por lo que `agregarProducto`/`quitarProducto` suman o restan `precio × cantidad` al `monto_total` (con `GREATEST(..., 0)`), sin persistir qué productos contiene el carrito. Los descuentos se derivan de `precio_antiguo` y el historial de `carrito_virtual.estado`. La tabla `sesion_web` no tiene endpoints (no se solicitó sesión). El modelo `clienteModel` cubre su tabla y valida la existencia del cliente al crear un carrito.
+
+**Registro en `app.js`:** routers importados y montados con `app.use()`, conservando el middleware 404 “Ruta no encontrada” **después** de todas las rutas y el manejador de errores al final. Puerto y credenciales intactos; CommonJS.
+
+**Verificación:** `node --check` sobre `app.js` y los 12 archivos nuevos → 13/13 OK.
+
+---
+
+## 54. 🔧 Corrección: `GET /api/products` no llegaba al controlador
+
+`GET http://localhost:3000/api/products` respondía `{"success":false,"message":"Ruta no encontrada"}`.
+
+**Causa exacta:** desajuste de prefijo. En `app.js` el router de productos estaba registrado solo en `/api/productos` (español), pero la petición es `/api/products` (inglés). Express no encontraba coincidencia y la petición caía en el middleware 404 final. No era problema de controlador, modelo, tabla ni exportación: `productoRoutes.js` existe con `router.get('/')`, se exporta/importa bien, `productoController.listar` consulta la tabla `producto` con SQL parametrizado, y el 404 ya estaba después de las rutas.
+
+| Cambio | Dónde |
+|--------|-------|
+| Alias en inglés añadido (se conserva el español para no eliminar endpoints): `app.use('/api/products', productoRoutes)` + `app.use('/api/productos', productoRoutes)` | `backend/src/app.js` |
+
+**Archivos modificados:** solo `backend/src/app.js`.
+
+**Ruta final registrada:** `GET /api/products` → `productoRoutes` → `productoController.listar` → `productoModel.listar()` → `SELECT ... FROM producto ORDER BY nombre`.
+
+**Verificación:** `node --check src/app.js` OK; servidor reiniciado; `GET /api/products` → **HTTP 200**, `success: true`, **14 productos** devueltos (ya no cae en “Ruta no encontrada”). Una tabla vacía devolvería 200 con lista vacía, no error de ruta.
