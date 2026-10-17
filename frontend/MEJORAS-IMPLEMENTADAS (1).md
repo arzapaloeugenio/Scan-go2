@@ -894,3 +894,68 @@ Se construyó la API REST del backend a partir de las 4 tablas definidas en `bac
 **Ruta final registrada:** `GET /api/products` → `productoRoutes` → `productoController.listar` → `productoModel.listar()` → `SELECT ... FROM producto ORDER BY nombre`.
 
 **Verificación:** `node --check src/app.js` OK; servidor reiniciado; `GET /api/products` → **HTTP 200**, `success: true`, **14 productos** devueltos (ya no cae en “Ruta no encontrada”). Una tabla vacía devolvería 200 con lista vacía, no error de ruta.
+
+---
+
+## 55. 🔌 Catálogo del frontend desde la API (`GET /api/products`) — Paso 2B
+
+El catálogo del frontend dejó de ser solo estático: ahora se carga desde el backend y, si este no responde, se conserva el catálogo local como respaldo. Sin tocar cámara, escáner, carrito, ingreso manual ni Service Worker.
+
+| Cambio | Dónde |
+|--------|-------|
+| Nueva constante de configuración `API_BASE_URL = "http://localhost:3000"` (punto único de URL) | `frontend/app.js` |
+| El arreglo local pasa a llamarse `PRODUCTOS_LOCALES` (se conserva intacto como respaldo) | `frontend/app.js` |
+| `let PRODUCTS = PRODUCTOS_LOCALES.slice()` → catálogo **activo** del frontend | `frontend/app.js` |
+| `normalizarProductoAPI(item)` → mapea la respuesta del backend a la estructura interna (`code`, `name`, `price`, `oldPrice`, `image`, `restricted`; `codigoBarras` como `String`; `precioAntiguo: null` respetado) y calcula `discount` | `frontend/app.js` |
+| `cargarProductosDesdeAPI()` (async) → `GET ${API_BASE_URL}/api/products`, comprueba `response.ok`, valida `success !== false` y arreglo `data`, normaliza y **reemplaza `PRODUCTS`** | `frontend/app.js` |
+| `init()` pasa a `async` y hace `await cargarProductosDesdeAPI()` antes de `renderCodesHelp()`/`renderAll()` | `frontend/app.js` |
+
+**Contrato de la respuesta procesada:** `{ success: true, data: [ { codigoBarras, nombre, precio, precioAntiguo, imagen, restringido } ] }` (se acepta arreglo directo o `data`). Rutas de imagen `img/…` reutilizadas sin cambios.
+
+**Fallback:** ante backend apagado, error de red, HTTP no-2xx, JSON inválido, `success:false`, `data` no-arreglo o arreglo vacío/inválido, se mantiene/restaura `PRODUCTOS_LOCALES` y se avisa una vez: `[catalogo] API no disponible; usando catálogo local de respaldo`. En éxito: `[catalogo] N productos cargados desde la API` (N dinámico). Un guard (`catalogoRemotoIntentado`) evita reejecuciones.
+
+**Archivos modificados:** solo `frontend/app.js`.
+
+**Verificación:** `node --check frontend/app.js` OK; con backend activo la consola muestra **14 productos**; con backend apagado la app sigue operando con el respaldo local.
+
+---
+
+## 56. 🔎 Búsqueda por código de barras contra la API — Paso 2C
+
+El escáner y el ingreso manual dejaron de buscar únicamente en el catálogo local: ahora consultan el endpoint real por código, con respaldo local si la petición falla. Sin duplicar lógica y sin tocar la cámara, sus callbacks ni la protección anti-repetición.
+
+| Cambio | Dónde |
+|--------|-------|
+| Nueva `buscarProductoPorCodigo(codigo)` (async) → `GET ${API_BASE_URL}/api/products/${encodeURIComponent(code)}`; normaliza `String(codigo).trim()` (conserva ceros iniciales); `response.ok` verificado; si el producto no está en `PRODUCTS`, se agrega para que `addToCart()` (sin cambios) lo encuentre | `frontend/app.js` |
+| Deduplicación de solicitudes con `busquedasProductoEnCurso` (Map) para la misma lectura rápida | `frontend/app.js` |
+| `onScannedCode` pasa a `async` y su búsqueda (`PRODUCTS.find`) se reemplaza por `await buscarProductoPorCodigo(code)` | `frontend/app.js` |
+| El ingreso manual reutiliza la **misma** función (sigue llamando a `onScannedCode`) | `frontend/app.js` |
+
+**Endpoint real utilizado:** `GET /api/products/:codigoBarras` (parámetro `codigoBarras`; alias `/api/productos/:codigoBarras`) → `productoController.buscarPorCodigoBarras` → `productoModel.buscarPorCodigo`. Éxito `200 { success:true, data:{…} }`; inexistente `404 { success:false, message:'Producto no encontrado' }`.
+
+**Comportamiento:** HTTP 404 → código no registrado (sin error general, sin agregar al carrito); error de red/backend apagado → respaldo local; si tampoco está local → mismo mensaje de no registrado.
+
+**Archivos modificados:** solo `frontend/app.js`.
+
+**Verificación:** `node --check frontend/app.js` OK; código registrado (manual y cámara) agrega al carrito; código inexistente muestra “no registrado”; con backend apagado el respaldo local sigue funcionando.
+
+---
+
+## 57. 🟥 Mensaje visual de “Código de barras no registrado”
+
+Antes, al ingresar manualmente un código de 13 dígitos inexistente (p. ej. `9999999999999`), `onScannedCode` salía en la rama de EAN inválido y el área de estado bajo el lector seguía mostrando en verde “Lectura inestable…”, sin consultar el backend ni avisar del código no registrado.
+
+**Causa raíz:** una guarda de EAN en `onScannedCode` (`code.length === 13 && !isValidEan13(code) && !isRegisteredCode(code)`) retornaba antes de la búsqueda, escribiendo `SCANNER_UNSTABLE_MSG` en `#scanResult` (texto verde).
+
+| Cambio | Dónde |
+|--------|-------|
+| Nueva `mostrarEstadoLector(mensaje, esError)`: punto único de salida del mensaje, **reutiliza el elemento existente `#scanResult`**, usa `textContent` y alterna la clase `is-error` | `frontend/app.js` |
+| Ventana de bloqueo `ESTADO_LECTOR_MS = 4000` (`estadoLectorBloqueadoHasta` + `estadoLectorTimer`): los mensajes no-error no sobrescriben el error durante su visualización; al expirar se restaura el área | `frontend/app.js` |
+| `onScannedCode`: se **elimina la guarda de EAN** (para que todo código numérico llegue a la búsqueda) y sus mensajes pasan por `mostrarEstadoLector`; la rama `!prod` muestra `Código de barras no registrado: [String(code).trim()]` con `esError = true` | `frontend/app.js` |
+| Nueva regla `.scan-result.is-error { color: #b71c1c; }` (rojo oscuro, sin verde; conserva el fondo) | `frontend/styles.css` |
+
+**Comportamiento:** código inexistente (manual o cámara) → mensaje rojo `Código de barras no registrado: [codigo]` visible ~4 s y sin agregar al carrito; código registrado → sin cambios (se agrega normal). El bucle de frames del escáner escribe en `#scannerStatus` (otro elemento), por lo que no sobrescribe `#scanResult`.
+
+**Archivos modificados:** `frontend/app.js` y `frontend/styles.css` (un único archivo de estilos, 1 línea). `index.html`, backend, `sw.js`, `manifest.json` y módulos Tobi sin cambios.
+
+**Verificación:** `node --check frontend/app.js` OK; mensaje rojo correcto para ingreso manual y cámara; “Lectura inestable” ya no reemplaza el mensaje de inmediato.

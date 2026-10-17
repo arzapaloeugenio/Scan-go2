@@ -5,6 +5,7 @@ const carritoController = require('../controllers/carritoController');
 
 const router = express.Router();
 
+router.post('/', carritoController.registrarCompra);
 router.get('/cliente/:idCliente', carritoController.listarOrdenes);
 router.get('/:id', carritoController.obtenerOrden);
 

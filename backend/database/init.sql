@@ -56,10 +56,27 @@ CREATE TABLE IF NOT EXISTS sesion_web (
 );
 
 -- ============================================================
+-- Tabla: orden_detalle
+-- Lineas de detalle de una compra. `carrito_virtual` actua como
+-- cabecera (id, id_cliente, fecha, monto_total, estado); aqui se
+-- guarda cada producto con su precio real y subtotal calculado.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS orden_detalle (
+  id SERIAL PRIMARY KEY,
+  id_carrito INTEGER NOT NULL REFERENCES carrito_virtual (id) ON DELETE CASCADE,
+  codigo_barras TEXT NOT NULL REFERENCES producto (codigo_barras) ON DELETE RESTRICT,
+  cantidad INTEGER NOT NULL CHECK (cantidad > 0),
+  precio_unitario NUMERIC(10,2) NOT NULL CHECK (precio_unitario >= 0),
+  subtotal NUMERIC(10,2) NOT NULL CHECK (subtotal >= 0)
+);
+
+-- ============================================================
 -- Indices para llaves foraneas
 -- ============================================================
 CREATE INDEX IF NOT EXISTS idx_carrito_virtual_id_cliente ON carrito_virtual (id_cliente);
 CREATE INDEX IF NOT EXISTS idx_sesion_web_id_cliente ON sesion_web (id_cliente);
+CREATE INDEX IF NOT EXISTS idx_orden_detalle_id_carrito ON orden_detalle (id_carrito);
+CREATE INDEX IF NOT EXISTS idx_orden_detalle_codigo_barras ON orden_detalle (codigo_barras);
 
 -- ============================================================
 -- Catalogo inicial: 14 productos desde ../frontend/app.js
@@ -87,6 +104,15 @@ ON CONFLICT (codigo_barras) DO UPDATE SET
   precio_antiguo = EXCLUDED.precio_antiguo,
   imagen = EXCLUDED.imagen,
   restringido = EXCLUDED.restringido;
+
+-- ============================================================
+-- Cliente de demostracion
+-- Requerido por carrito_virtual.id_cliente (NOT NULL, FK).
+-- Carga repetible: ON CONFLICT evita duplicar por dni/correo.
+-- ============================================================
+INSERT INTO cliente (dni, nombre, correo) VALUES
+  ('99999999', 'Cliente Demo', 'demo@scan-go.local')
+ON CONFLICT (dni) DO NOTHING;
 
 -- ============================================================
 -- Consultas de comprobacion (no exponen informacion sensible)

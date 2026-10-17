@@ -257,6 +257,93 @@ async function obtenerOrden(req, res) {
   }
 }
 
+// POST /api/ordenes
+// Body: { idCliente | usuarioId, items: [{ codigoBarras, cantidad }] }
+// Los precios, subtotales y total se calculan en el backend a partir de
+// PostgreSQL; se ignora cualquier precio o total enviado por el cliente.
+async function registrarCompra(req, res) {
+  try {
+    const body = req.body || {};
+
+    const idCliente = parsearId(body.idCliente ?? body.usuarioId);
+    if (idCliente === null) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'idCliente invalido' });
+    }
+
+    const { items } = body;
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'La compra debe contener al menos un producto',
+      });
+    }
+
+    // Valida cada item y agrupa codigos repetidos sumando cantidades.
+    const agrupados = new Map();
+    for (const item of items) {
+      if (!item || typeof item !== 'object') {
+        return res.status(400).json({
+          success: false,
+          message: 'Cada item debe ser un objeto valido',
+        });
+      }
+
+      if (typeof item.codigoBarras !== 'string' || item.codigoBarras.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'El codigo de barras es obligatorio',
+        });
+      }
+
+      const { cantidad } = item;
+      if (!Number.isInteger(cantidad) || cantidad <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'La cantidad debe ser un entero mayor que cero',
+        });
+      }
+
+      const codigo = item.codigoBarras.trim();
+      agrupados.set(codigo, (agrupados.get(codigo) || 0) + cantidad);
+    }
+
+    const normalizados = [...agrupados.entries()].map(
+      ([codigoBarras, cantidad]) => ({ codigoBarras, cantidad })
+    );
+
+    const compra = await carritoModel.registrarCompra(idCliente, normalizados);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Compra registrada correctamente',
+      data: {
+        compraId: compra.id,
+        total: compra.total,
+        items: compra.items,
+      },
+    });
+  } catch (error) {
+    if (error instanceof carritoModel.ErrorDatos) {
+      if (error.codigo === 'PRODUCTO_NO_ENCONTRADO') {
+        return res.status(404).json({
+          success: false,
+          message: 'Producto no encontrado',
+          codigoBarras: error.codigoBarras,
+        });
+      }
+      if (error.codigo === 'CLIENTE_NO_ENCONTRADO') {
+        return res
+          .status(404)
+          .json({ success: false, message: 'Cliente no encontrado' });
+      }
+    }
+
+    return responderError(res, error, 'registrarCompra');
+  }
+}
+
 module.exports = {
   obtenerCarritoActivo,
   obtenerCarrito,
@@ -266,4 +353,5 @@ module.exports = {
   confirmarCarrito,
   listarOrdenes,
   obtenerOrden,
+  registrarCompra,
 };
