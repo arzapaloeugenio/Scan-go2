@@ -351,6 +351,14 @@ python3 -m http.server 8000
 
 ## Historial de cambios técnicos
 
+### Ingreso por DNI + Google «próximamente» (Etapa 3)
+- **El ingreso por DNI está activo.** En `#loginCard` el formulario `#dniLoginForm` pide el DNI, lo limpia (sin espacios, solo dígitos, máx. 8), valida el formato (exactamente 8 dígitos) y **evita solicitudes vacías**. Mientras consulta, deshabilita `#btnDniLogin` y muestra «Verificando…»; al terminar lo reactiva (éxito o error).
+- Consulta la **ruta real del backend** `POST /api/clientes/dni` (`{ dni }`, `API_BASE_URL`). `200` → identifica al cliente (`id`, `nombre`, `dni`); `404` → «El DNI no está registrado…»; error de red → mensaje controlado sin bloquear la interfaz.
+- **El DNI identifica al cliente dentro del prototipo académico; NO es autenticación de alta seguridad** (no hay contraseña ni token). El estado reutiliza el sistema existente `localStorage['tottus_user']` (ahora con `id` real); `currentClienteId()` usa ese `id` (o el cliente demo `USUARIO_DEMO_ID`) para historial y registro de compra. Se conservan el lector de códigos, el carrito y el flujo de pago sin cambios.
+- **Google queda preparado en el backend pero desactivado en el frontend.** El botón «G» (`#btnGoogleAccess`) **no** llama a `POST /api/auth/google`, **no** carga Google Identity Services, **no** abre formularios ni crea usuarios: solo muestra un aviso integrado y cerrable («El inicio de sesión con Google estará disponible próximamente. Por ahora, ingresa con tu DNI.») con `aria-label` actualizado. Para habilitarlo se necesitará `GOOGLE_CLIENT_ID` y conectar el `credential` real.
+- **No se usa autenticación falsa:** no se crean tokens, correos ni `google_id` inventados. Se retiró el mensaje temporal de prueba/desarrollo del registro («Se requiere un servidor para crear una cuenta real»).
+- `API_BASE_URL`: local (`localhost`/`127.0.0.1`) → `http://localhost:3000`; en despliegue → mismo origen, o `window.SCANGO_API_BASE_URL` si el backend vive en otra URL (sin URL local fija en producción).
+
 ### Sesión TOBI conversacional (2026-10-08/09, rama `cambios-texto`)
 - Commits: `WIP: Tobi Saltito` → `Tobi saluda al abrirce` → backup → `Agregacion del chat con Tobi` → `Saludo en el chat de Tobi` → `Alergias` → `Recetas` (+ trabajo sin commitear: frecuentes, descuentos, pasos 8.x).
 - Saludo en el propio botón (`.tobi-greet` 2.6 s + `.tobi-nudge` 7 s/3.5 s, `prefers-reduced-motion`, diálogos intactos); vista `view-tobi` + `tobi-chat.js` (reglas, typing, scroll); `tobi-history.js` (30/200, `getUserName`, saludo 1×/visita); `tobi-profile.js` (alergias 20/40, frecuentes 30, lista 50); `tobi-recipes.js` (27 recetas, filtro estricto); `tobi-discounts.js` (8 promos, Lima); `tobi-allergens.js` (tabla 14, modal, badges); comprensión (`tobiCanon`, `tobiFollowUp`, 3 botones), sugerencias (máx. 4). SW `tottus-scan-go-v10`.

@@ -48,14 +48,28 @@
           <div>🛡️<b>Valida y sal</b></div>
         </div>
         <div class="hero-auth">
-          <button type="button" id="btnGoogleAccess" class="btn-google-circle" aria-label="Continuar con Google"><i class="fa-brands fa-google" aria-hidden="true"></i></button>
+          <button type="button" id="btnGoogleAccess" class="btn-google-circle" aria-label="Continuar con Google (función próximamente)"><i class="fa-brands fa-google" aria-hidden="true"></i></button>
           <button type="button" class="hero-btn hero-btn-primary" id="btnGoLogin" aria-expanded="false" aria-controls="loginCard">Iniciar sesión</button>
           <button type="button" class="hero-btn hero-btn-tertiary" id="btnDemo">Probar demo</button>
         </div>
+        <p id="googleNotice" class="hero-notice" role="status" aria-live="polite" hidden>
+          <span>El inicio de sesión con Google estará disponible próximamente. Por ahora, ingresa con tu DNI.</span>
+          <button type="button" class="hero-notice-close" id="btnCloseGoogleNotice" aria-label="Cerrar aviso">✕</button>
+        </p>
       </div>
       <div id="loginCard" class="card auth-card" hidden aria-hidden="true">
         <h2>Iniciar sesión</h2>
-        <p class="muted small">Ingresa para continuar con Scan &amp; Go</p>
+        <p class="muted small">Ingresa con tu DNI para continuar con Scan &amp; Go</p>
+        <form id="dniLoginForm" novalidate>
+          <label for="dniLogin">
+            DNI (8 dígitos)
+            <input type="text" id="dniLogin" placeholder="Ej: 12345678" inputmode="numeric" maxlength="8" pattern="\d{8}" autocomplete="off" />
+          </label>
+          <p class="field-error" id="dniLoginError" hidden aria-live="polite"></p>
+          <button type="submit" class="btn-primary" id="btnDniLogin">Ingresar con DNI</button>
+        </form>
+        <p class="demo-divider">o</p>
+        <p class="muted small">Acceso con correo (demostración)</p>
         <form id="emailLoginForm" novalidate>
           <label for="authEmail">
             Correo electrónico

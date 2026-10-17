@@ -8,10 +8,40 @@ const carritoRoutes = require('./routes/carritoRoutes');
 const ordenRoutes = require('./routes/ordenRoutes');
 const descuentoRoutes = require('./routes/descuentoRoutes');
 const historialRoutes = require('./routes/historialRoutes');
+const authRoutes = require('./routes/authRoutes');
+const clienteRoutes = require('./routes/clienteRoutes');
 
 const app = express();
 
-app.use(cors());
+// CORS: se permiten SOLO los origenes configurados por variables de entorno.
+// No se usa origin: "*" ni credentials (en esta etapa no hay cookies de sesion).
+// Ejemplos de configuracion:
+//   FRONTEND_URL=https://tu-frontend.example.com
+//   FRONTEND_URL_LOCAL=http://localhost:8000
+const origenesPermitidos = [
+  ...(process.env.FRONTEND_URL || '').split(','),
+  ...(process.env.FRONTEND_URL_LOCAL || '').split(','),
+]
+  .map((origen) => origen.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin(origen, callback) {
+      // Sin encabezado Origin (curl, health checks, mismo host): se permite.
+      if (!origen) {
+        return callback(null, true);
+      }
+      if (origenesPermitidos.includes(origen)) {
+        return callback(null, true);
+      }
+      // Origen no permitido: sin cabecera CORS (el navegador lo bloquea).
+      return callback(null, false);
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type'],
+  })
+);
 app.use(express.json());
 
 app.get('/', (req, res) => {
@@ -29,6 +59,8 @@ app.use('/api/carrito', carritoRoutes);
 app.use('/api/ordenes', ordenRoutes);
 app.use('/api/descuentos', descuentoRoutes);
 app.use('/api/historial', historialRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/clientes', clienteRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

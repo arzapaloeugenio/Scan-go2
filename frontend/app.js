@@ -9,7 +9,23 @@ const QR_CAJA_TTL_SEC = 5 * 60;
 const QR_SALIDA_TTL_SEC = 3 * 60;
 const QR_SECRET = "tottus-scan-go-demo";
 // URL base del backend. Punto único de configuración de la API.
-const API_BASE_URL = "http://localhost:3000";
+// - Desarrollo local (localhost/127.0.0.1): backend en http://localhost:3000.
+// - Despliegue: por defecto se usa el MISMO origen (backend que sirve el frontend).
+//   Si el backend vive en otra URL, se define antes de cargar app.js:
+//     <script>window.SCANGO_API_BASE_URL = "https://mi-backend.example.com";</script>
+// Esto evita depender de una URL local fija en producción.
+const API_BASE_URL = (() => {
+  const override = (typeof window !== "undefined" && window.SCANGO_API_BASE_URL) || "";
+  if (String(override).trim() !== "") {
+    return String(override).trim().replace(/\/+$/, "");
+  }
+  const host = (typeof location !== "undefined" && location.hostname) || "";
+  // Desarrollo local: localhost, 127.0.0.1, IPv6 local o archivo abierto directamente.
+  if (host === "" || host === "localhost" || host === "127.0.0.1" || host === "::1") {
+    return "http://localhost:3000";
+  }
+  return ""; // despliegue: mismo origen (o window.SCANGO_API_BASE_URL)
+})();
 
 // Catálogo local de respaldo (se conserva intacto). Se usa cuando la API no responde.
 const PRODUCTOS_LOCALES = [
@@ -175,7 +191,7 @@ async function cargarHistorialRemoto() {
   if (historialCargando) return;
   historialCargando = true;
   try {
-    const response = await fetch(`${API_BASE_URL}/api/historial/cliente/${USUARIO_DEMO_ID}`);
+    const response = await fetch(`${API_BASE_URL}/api/historial/cliente/${currentClienteId()}`);
     let payload = null;
     try { payload = await response.json(); } catch { payload = null; }
     if (response.ok && payload && payload.success === true && Array.isArray(payload.data)) {
@@ -1380,8 +1396,14 @@ Items: ${q}/${MAX_ITEMS}`;
 // carritoController.registrarCompra). El backend recalcula precios, subtotales
 // y total en PostgreSQL (transacción BEGIN/COMMIT/ROLLBACK); el frontend nunca
 // envía precios ni totales como fuente de verdad.
-// id del cliente demo sembrado en backend/database/init.sql (dni 99999999).
+// id del cliente demo sembrado en database/init/02-insert-data.sql (dni 99999999).
 const USUARIO_DEMO_ID = 1;
+// Identificador real del cliente identificado (por DNI) y guardado en
+// localStorage['tottus_user']; si no hay uno, se usa el cliente demo.
+function currentClienteId() {
+  const u = getUser();
+  return (u && Number.isInteger(u.id) && u.id > 0) ? u.id : USUARIO_DEMO_ID;
+}
 // Protección contra doble pago: bloquea nuevos envíos mientras hay uno en curso.
 let pagoEnProceso = false;
 
@@ -1412,7 +1434,7 @@ async function registrarCompra(carrito = cart) {
     const response = await fetch(`${API_BASE_URL}/api/ordenes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ usuarioId: USUARIO_DEMO_ID, items }),
+      body: JSON.stringify({ usuarioId: currentClienteId(), items }),
     });
     // Un solo parseo: si el cuerpo no es JSON válido se trata como error.
     let payload = null;
@@ -1585,15 +1607,12 @@ async function init() {
         if (firstBad && $(firstBad)) $(firstBad).focus({ preventScroll: false });
         return;
       }
-      const success = $("registerSuccess");
-      if (success) {
-        success.textContent = "Registro de demostración completado. Se requiere un servidor para crear una cuenta real.";
-        success.hidden = false;
-      }
-      // Seguridad: nunca guardar ni registrar contraseñas.
+      // Etapa 3: se retiró el mensaje temporal de prueba/desarrollo
+      // ("Se requiere un servidor para crear una cuenta real"). El registro
+      // local de la demo solo valida el formulario. Por seguridad, nunca se
+      // guardan ni registran contraseñas.
       if ($("loginPass")) $("loginPass").value = "";
       if ($("loginPassConfirm")) $("loginPassConfirm").value = "";
-      toast("Registro de demostración completado. Se requiere un servidor para crear una cuenta real.");
     });
     // DNI: solo números, máximo 8 caracteres.
     const dniInput = $("loginDNI");
@@ -1622,15 +1641,123 @@ async function init() {
     $("btnDemo").addEventListener("click", enterDemo);
   }
 
-  // Acceso con Google: sin integración real (sin OAuth, sin backend).
-  // Respuesta visible y controlada: no simula sesión ni crea usuario.
+  // Acceso con Google: función PRÓXIMAMENTE (Etapa 3).
+  // No se llama a POST /api/auth/google, no se carga Google Identity Services,
+  // no se abre ningún formulario y no se simula sesión ni cuenta: solo se
+  // muestra un aviso breve e integrado, cerrable y con auto-cierre accesible.
   function handleGoogleAccess() {
-    toast("El acceso con Google aún no está configurado en esta demo");
+    const notice = $("googleNotice");
+    if (!notice) {
+      toast("El inicio de sesión con Google estará disponible próximamente. Por ahora, ingresa con tu DNI.");
+      return;
+    }
+    notice.hidden = false;
+    clearTimeout(notice._timer);
+    notice._timer = setTimeout(() => { notice.hidden = true; }, 7000);
   }
   if (!window._googleAccessBound) {
     window._googleAccessBound = true;
     const btnGoogleAccess = $("btnGoogleAccess");
     if (btnGoogleAccess) btnGoogleAccess.addEventListener("click", handleGoogleAccess);
+    const btnCloseGoogleNotice = $("btnCloseGoogleNotice");
+    if (btnCloseGoogleNotice) btnCloseGoogleNotice.addEventListener("click", () => {
+      const notice = $("googleNotice");
+      if (notice) { notice.hidden = true; clearTimeout(notice._timer); }
+    });
+  }
+
+  // ---------- Ingreso por DNI (identificación contra el backend) ----------
+  // El DNI IDENTIFICA al cliente dentro del prototipo académico; no es
+  // autenticación de alta seguridad. Se consulta la ruta real
+  // POST /api/clientes/dni y, si el cliente existe, se continúa el flujo actual.
+  function setDniLoginError(msg) {
+    const err = $("dniLoginError");
+    const input = $("dniLogin");
+    const ok = !msg;
+    if (err) { err.hidden = ok; if (!ok) err.textContent = msg; }
+    if (input) input.setAttribute("aria-invalid", String(!ok));
+    return ok;
+  }
+  async function ingresarConDni(event) {
+    if (event) event.preventDefault();
+    const input = $("dniLogin");
+    const btn = $("btnDniLogin");
+    // 2) Quitar espacios innecesarios.
+    const dni = input ? String(input.value || "").replace(/\s+/g, "") : "";
+
+    // 4) Evitar solicitudes con el campo vacío.
+    if (dni === "") { setDniLoginError("Ingresa tu DNI."); return; }
+    // 3) Validar el formato esperado por el proyecto (8 dígitos).
+    if (!/^\d{8}$/.test(dni)) { setDniLoginError("El DNI debe tener exactamente 8 números."); return; }
+    setDniLoginError("");
+
+    const btnTexto = btn ? btn.textContent : "";
+    // 5) Desactivar el botón + 6) indicador breve de carga mientras se procesa.
+    if (btn) { btn.disabled = true; btn.textContent = "Verificando…"; }
+
+    try {
+      // 7) Consultar la ruta real del backend.
+      const response = await fetch(`${API_BASE_URL}/api/clientes/dni`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dni }),
+      });
+
+      // 9) Mensaje claro si el DNI no está registrado.
+      if (response.status === 404) {
+        setDniLoginError("El DNI no está registrado. Verifica el número o usa «Probar demo».");
+        return;
+      }
+      if (!response.ok) {
+        setDniLoginError("No se pudo validar el DNI en este momento. Inténtalo de nuevo.");
+        return;
+      }
+
+      let payload = null;
+      try { payload = await response.json(); } catch { payload = null; }
+      const cliente = payload && payload.data;
+      if (!cliente || !cliente.id) {
+        setDniLoginError("Respuesta inesperada del servidor. Inténtalo de nuevo.");
+        return;
+      }
+
+      // 8/3) Cliente identificado: se reutiliza el estado existente
+      // (localStorage['tottus_user']) y se continúa el flujo actual de Scan & Go.
+      const profile = {
+        id: cliente.id,
+        name: cliente.nombre || "Cliente",
+        dni: cliente.dni || dni,
+        email: "",
+        birth: "",
+        age: null,
+        isAdult: true,
+      };
+      try { localStorage.setItem("tottus_user", JSON.stringify(profile)); } catch { /* noop */ }
+      demoMode = false;
+      if (input) input.value = "";
+      updateAuthUI();
+      cargarHistorialRemoto();
+      const firstName = String(profile.name).split(" ")[0];
+      toast(`👋 Bienvenido/a, ${firstName}`);
+      botSay(`👋 <b>¡Hola, ${firstName}!</b> Soy <b>Tobi</b> 🤖. Escanea con 📷 <b>Escanear</b>, paga desde tu celular y valida en caja y salida. ¡Sin colas!`);
+    } catch (error) {
+      // 10) Error de conexión controlado: no bloquea la interfaz.
+      setDniLoginError("No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.");
+    } finally {
+      // 11) Reactivar el botón al finalizar.
+      if (btn) { btn.disabled = false; btn.textContent = btnTexto || "Ingresar con DNI"; }
+    }
+  }
+  if (!window._dniLoginBound) {
+    window._dniLoginBound = true;
+    const dniForm = $("dniLoginForm");
+    if (dniForm) dniForm.addEventListener("submit", ingresarConDni);
+    const dniInputLogin = $("dniLogin");
+    if (dniInputLogin) dniInputLogin.addEventListener("input", () => {
+      const clean = dniInputLogin.value.replace(/\D/g, "").slice(0, 8);
+      if (dniInputLogin.value !== clean) dniInputLogin.value = clean;
+      if (dniInputLogin.value) setDniLoginError("");
+    });
   }
 
   // Login mejorado: ver/ocultar contraseña
@@ -1679,8 +1806,8 @@ async function init() {
       if (card) { card.hidden = false; card.setAttribute("aria-hidden", "false"); }
       if ($("btnGoLogin")) $("btnGoLogin").setAttribute("aria-expanded", "true");
       if ($("btnGoRegister")) $("btnGoRegister").setAttribute("aria-expanded", "false");
-      const mail = $("authEmail");
-      if (mail) setTimeout(() => mail.focus({ preventScroll: false }), 50);
+      const firstField = $("dniLogin") || $("authEmail");
+      if (firstField) setTimeout(() => firstField.focus({ preventScroll: false }), 50);
     }
     function showRegister(opener) {
       lastOpener = opener || null;

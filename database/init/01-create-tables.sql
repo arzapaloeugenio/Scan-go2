@@ -1,21 +1,47 @@
--- Scan & Go: script SQL inicial (FASE 4A).
--- Crea las tablas base cliente, producto, carrito_virtual y sesion_web,
--- e inserta el catalogo inicial de 14 productos del frontend.
--- Compatible con PostgreSQL. No crea ni elimina bases de datos.
+-- Scan & Go: creacion de tablas (Etapa 1 - reorganizacion de la base de datos).
+-- Fuente original: backend/database/init.sql (movido a database/init/).
+--
+-- Este script crea la estructura completa desde cero. Es idempotente:
+-- todas las sentencias usan IF NOT EXISTS, por lo que puede ejecutarse
+-- varias veces sin errores ni perdida de datos.
+--
+-- Orden de creacion respetando claves foraneas:
+--   1) cliente            2) producto
+--   3) carrito_virtual    4) sesion_web      (dependen de cliente)
+--   5) orden_detalle      (depende de carrito_virtual y producto)
+--
+-- No crea ni elimina bases de datos. No requiere extensiones adicionales:
+-- SERIAL, NUMERIC y TIMESTAMPTZ son tipos nativos de PostgreSQL.
+-- Los datos iniciales viven en 02-insert-data.sql.
 
 BEGIN;
 
 -- ============================================================
 -- Tabla: cliente
 -- ============================================================
+-- Se conservan TODAS las columnas y restricciones originales.
+-- Cambios para la Etapa 1 (preparacion de autenticacion con Google):
+--   * dni pasa a ser OPCIONAL (NULL permitido) para cuentas creadas via
+--     Google. No es clave primaria (la PK real es `id`), por lo que quitar
+--     NOT NULL es seguro y no destructivo. Se conserva el CHECK original
+--     (dni <> ''): en SQL, NULL no incumple ese CHECK.
+--   * Se agregan email, foto_url y google_id para Google OAuth (Etapa 2).
+--     NOTA: la tabla ya tiene `correo` (UNIQUE, NOT NULL), usado por el
+--     backend actual (src/models/clienteModel.js). `email` se agrega segun
+--     lo solicitado; ver database/README.md para la recomendacion de unificar
+--     `correo` y `email` en una etapa posterior.
 CREATE TABLE IF NOT EXISTS cliente (
   id SERIAL PRIMARY KEY,
-  dni TEXT NOT NULL UNIQUE CHECK (dni <> ''),
+  dni TEXT UNIQUE CHECK (dni <> ''),
   nombre TEXT NOT NULL CHECK (nombre <> ''),
   correo TEXT NOT NULL UNIQUE CHECK (correo <> ''),
   fecha_nacimiento DATE,
   edad INTEGER CHECK (edad IS NULL OR edad >= 0),
-  es_adulto BOOLEAN NOT NULL DEFAULT FALSE
+  es_adulto BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Columnas nuevas para autenticacion con Google (Etapa 2):
+  email VARCHAR(150) UNIQUE,
+  foto_url TEXT,
+  google_id VARCHAR(255) UNIQUE
 );
 
 -- edad y es_adulto son datos derivados de fecha_nacimiento y deberan
@@ -77,47 +103,5 @@ CREATE INDEX IF NOT EXISTS idx_carrito_virtual_id_cliente ON carrito_virtual (id
 CREATE INDEX IF NOT EXISTS idx_sesion_web_id_cliente ON sesion_web (id_cliente);
 CREATE INDEX IF NOT EXISTS idx_orden_detalle_id_carrito ON orden_detalle (id_carrito);
 CREATE INDEX IF NOT EXISTS idx_orden_detalle_codigo_barras ON orden_detalle (codigo_barras);
-
--- ============================================================
--- Catalogo inicial: 14 productos desde ../frontend/app.js
--- Fuente de verdad: PRODUCTS (code, name, price, oldPrice, image, restricted).
--- Carga repetible: ON CONFLICT actualiza sin duplicar ni borrar.
--- ============================================================
-INSERT INTO producto (codigo_barras, nombre, precio, precio_antiguo, imagen, restringido) VALUES
-  ('7750123450013', 'Leche Gloria Entera 1L', 5.20, 5.90, 'img/LecheGloriaEntera1L.png', FALSE),
-  ('7750123450020', 'Pan de Molde Blanco 650g', 7.50, NULL, 'img/Bimbo.png', FALSE),
-  ('7750123450037', 'Arroz Superior 5kg', 22.90, 26.90, 'img/Costeño.png', FALSE),
-  ('7750123450044', 'Aceite Vegetal 1L', 9.80, NULL, 'img/Primor.png', FALSE),
-  ('7750123450051', 'Pollo Entero x kg', 12.90, 14.50, 'img/PolloTottus.png', FALSE),
-  ('7750123450068', 'Gaseosa Inca Kola 2L', 8.50, 9.50, 'img/IncaKola.png', FALSE),
-  ('7750123450075', 'Fideos Spaghetti 500g', 3.80, NULL, 'img/don-vittorio-spaguetti-x-500-gr.png', FALSE),
-  ('7750123450082', 'Detergente 2kg', 24.90, 32.90, 'img/Ariel.png', FALSE),
-  ('7750123450099', 'Manzana Gala x kg', 6.90, NULL, 'img/TottusFresco.png', FALSE),
-  ('7750123450105', 'Chocolate Sublime 40g', 2.50, 3.00, 'img/NestléSublime.png', FALSE),
-  ('7750123450112', 'Café Instantáneo 200g', 19.90, 23.90, 'img/Nescafé.png', FALSE),
-  ('7750123450129', 'Papel Higiénico 24 rollos', 27.50, NULL, 'img/Suave.png', FALSE),
-  ('7750123450136', 'Cerveza Cristal Six Pack 355ml', 24.90, 29.90, 'img/CRISTAL-SIX-PACK-LATA.png', TRUE),
-  ('7750123450143', 'Vino Tinto Borgoña 750ml', 32.50, NULL, 'img/Tabernero.png', TRUE)
-ON CONFLICT (codigo_barras) DO UPDATE SET
-  nombre = EXCLUDED.nombre,
-  precio = EXCLUDED.precio,
-  precio_antiguo = EXCLUDED.precio_antiguo,
-  imagen = EXCLUDED.imagen,
-  restringido = EXCLUDED.restringido;
-
--- ============================================================
--- Cliente de demostracion
--- Requerido por carrito_virtual.id_cliente (NOT NULL, FK).
--- Carga repetible: ON CONFLICT evita duplicar por dni/correo.
--- ============================================================
-INSERT INTO cliente (dni, nombre, correo) VALUES
-  ('99999999', 'Cliente Demo', 'demo@scan-go.local')
-ON CONFLICT (dni) DO NOTHING;
-
--- ============================================================
--- Consultas de comprobacion (no exponen informacion sensible)
--- ============================================================
-SELECT COUNT(*) AS total_productos FROM producto;
-SELECT codigo_barras, nombre, precio, precio_antiguo, imagen, restringido FROM producto ORDER BY codigo_barras;
 
 COMMIT;
