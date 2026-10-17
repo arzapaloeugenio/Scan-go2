@@ -1257,7 +1257,7 @@ function startQrTimer() {
 
 function openCheckout() {
   const qty = cartTotalQty();
-  if (!qty && !order) { toast("🛒 Agrega productos primero"); return; }
+  if (!qty && !order) { toast("No hay productos en el carrito."); return; }
   if (order && (order.status === "PAGADO_PENDIENTE_CAJA" || order.status === "VALIDADO_CAJA")) {
     restoreOrderUI();
     showView("checkout"); return; // retomar flujo vigente (persistido)
@@ -1333,9 +1333,72 @@ Items: ${q}/${MAX_ITEMS}`;
   toast("🧾 Revisa y pulsa Pagar");
 }
 
-function payNow() {
+// ---------- REGISTRO DE COMPRA EN BACKEND (botón "Pagar ahora") ----------
+// Endpoint real: POST /api/ordenes  (backend/src/routes/ordenRoutes.js →
+// carritoController.registrarCompra). El backend recalcula precios, subtotales
+// y total en PostgreSQL (transacción BEGIN/COMMIT/ROLLBACK); el frontend nunca
+// envía precios ni totales como fuente de verdad.
+// id del cliente demo sembrado en backend/database/init.sql (dni 99999999).
+const USUARIO_DEMO_ID = 1;
+// Protección contra doble pago: bloquea nuevos envíos mientras hay uno en curso.
+let pagoEnProceso = false;
+
+// Transforma el carrito ({ codigo: cantidad }) en los items exactos del backend
+// y registra la compra. Devuelve los `data` confirmados por el servidor
+// (compraId/total/items) o null ante cualquier error; en todos los errores el
+// carrito se conserva intacto y no se registra nada localmente.
+async function registrarCompra(carrito = cart) {
+  if (pagoEnProceso) return null;
+  const items = [];
+  for (const [code, qty] of Object.entries(carrito || {})) {
+    const codigoBarras = String(code == null ? "" : code).trim();
+    const cantidad = Number(qty);
+    if (!codigoBarras) continue; // sin elementos vacíos
+    if (!Number.isInteger(cantidad) || cantidad <= 0) continue; // entero > 0
+    items.push({ codigoBarras, cantidad });
+  }
+  if (!items.length) {
+    toast("No hay productos en el carrito.");
+    return null;
+  }
+
+  const btn = $("btnPayNow");
+  const btnTexto = btn ? btn.textContent : "";
+  pagoEnProceso = true;
+  if (btn) { btn.disabled = true; btn.textContent = "Procesando..."; }
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/ordenes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ usuarioId: USUARIO_DEMO_ID, items }),
+    });
+    // Un solo parseo: si el cuerpo no es JSON válido se trata como error.
+    let payload = null;
+    try { payload = await response.json(); } catch { payload = null; }
+    // Éxito real: HTTP 2xx + success true + identificador de compra presente.
+    if (!response.ok || !payload || payload.success !== true
+        || !payload.data || payload.data.compraId == null) {
+      const msg = (payload && typeof payload.message === "string" && payload.message)
+        ? payload.message
+        : "No se pudo registrar la compra. Inténtalo nuevamente.";
+      toast(msg); // mensaje seguro emitido por la API (toast usa textContent)
+      return null;
+    }
+    return payload.data;
+  } catch {
+    // Backend apagado o error de red: no se simula ninguna compra.
+    toast("No se pudo conectar con el servidor. Tu carrito se conserva.");
+    return null;
+  } finally {
+    pagoEnProceso = false;
+    if (btn) { btn.disabled = false; btn.textContent = btnTexto || "Pagar ahora"; }
+  }
+}
+
+async function payNow() {
+  if (pagoEnProceso) return; // ignora clics repetidos mientras se procesa
   const qty = cartTotalQty();
-  if (!qty) { toast("El carrito está vacío"); return; }
+  if (!qty) { toast("No hay productos en el carrito."); return; }
   const { t } = buildPreTicket();
   const method = document.querySelector('input[name="payMethod"]:checked')?.value || "Yape";
   if (method === "Tarjeta") {
@@ -1346,16 +1409,26 @@ function payNow() {
     if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(exp)) { toast("⚠️ Vence MM/AA"); return; }
     if (!/^\d{3}$/.test(cvv)) { toast("⚠️ CVV 3 dígitos"); return; }
   }
+  // 1) Registra la compra en el backend ANTES de tocar el carrito.
+  //    Si falla (red/400/404/500) se conserva tal cual.
+  const compra = await registrarCompra(cart);
+  if (!compra) return;
+  // 2) El total confiable es el que confirmó el servidor.
+  const totalConfirmado = Number(compra.total);
+  const total = Number.isFinite(totalConfirmado) ? totalConfirmado : t.total;
+  const subtotal = total / (1 + IGV_RATE);
   const paySecs = payT0 ? ((performance.now() - payT0) / 1000) : 0;
   const ticketId = "TSG-" + Date.now().toString(36).toUpperCase();
   order = {
     ticketId, method,
-    total: t.total, subtotal: t.subtotal, igv: t.igv, saving: t.saving, qty,
+    compraId: compra.compraId,
+    total, subtotal, igv: total - subtotal, saving: t.saving, qty,
     items: JSON.parse(JSON.stringify(cart)),
     status: "PAGADO_PENDIENTE_CAJA",
     caja: null, salida: null, paySecs: Math.round(paySecs),
   };
-  // Pago simulado exitoso → vaciar carrito (ya está cobrado)
+  // 3) Solo con la compra confirmada se limpia el carrito (misma clave de
+  //    localStorage que ya usa saveState → "tottus_cart").
   cart = {}; saveState(); renderAll();
   issueCajaQR();
   saveOrder();
@@ -1365,7 +1438,7 @@ function payNow() {
   $("payStep4").hidden = true;
   setCheckoutStep(2);
   payT0 = 0;
-  toast(`💚 Pago ${method} aprobado en ${paySecs.toFixed(0)}s (meta ≤60s ${paySecs <= 60 ? "✅" : "⚠️"})`);
+  toast(`Compra registrada correctamente. N.° de compra: ${compra.compraId} · Total: ${money(total)}`);
 }
 
 function issueCajaQR() {
