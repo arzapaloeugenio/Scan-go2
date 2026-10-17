@@ -2,7 +2,7 @@
 
 > Documento de trabajo: segunda iteración del proyecto **Tottus Scan & Go** (Universidad Norbert Wiener – Software 1, Proyecto Integrador).
 > Fecha: septiembre 2026 · Equipo: Arzapalo, Alva, Cabrejos, Condori · Ciclo: IS4M1.
-> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–28 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio, revisión final y visibilidad nav/TOBI solo en dashboard). **Sexta iteración (TOBI conversacional, octubre 2026):** secciones 39–50 (saludo animado y saltito, chat aparte, historial, saludo con nombre, alergias, productos frecuentes, recetas con filtro, descuentos del día, comprensión, alerta en catálogo, lista de compras y sugerencias). **Séptima iteración (backend Node/Express/PostgreSQL, octubre 2026):** secciones 53–54 documentan la API REST (modelos, controladores y rutas sobre las tablas de `backend/database/init.sql`) y la corrección de la ruta `/api/products`. Todo el código se genera solo con **Opencode**.
+> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–28 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio, revisión final y visibilidad nav/TOBI solo en dashboard). **Sexta iteración (TOBI conversacional, octubre 2026):** secciones 39–50 (saludo animado y saltito, chat aparte, historial, saludo con nombre, alergias, productos frecuentes, recetas con filtro, descuentos del día, comprensión, alerta en catálogo, lista de compras y sugerencias). **Séptima iteración (backend Node/Express/PostgreSQL, octubre 2026):** secciones 53–54 documentan la API REST (modelos, controladores y rutas sobre las tablas de `backend/database/init.sql`) y la corrección de la ruta `/api/products`; §55–§57 la integración del catálogo y la búsqueda por código del frontend con la API. **Cierre del backend (octubre 2026):** §58–§61 documentan el registro de compras con detalles y transacción (`orden_detalle`, `POST /api/ordenes`), la conexión del pago del frontend (botón *Pagar* + protección anti doble pago), el historial desde PostgreSQL con respaldo local y la auditoría final del backend. Todo el código se genera solo con **Opencode**.
 
 Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 
@@ -873,6 +873,8 @@ Se construyó la API REST del backend a partir de las 4 tablas definidas en `bac
 
 **Notas de diseño (limitaciones del esquema):** no existe tabla de líneas de detalle del carrito, por lo que `agregarProducto`/`quitarProducto` suman o restan `precio × cantidad` al `monto_total` (con `GREATEST(..., 0)`), sin persistir qué productos contiene el carrito. Los descuentos se derivan de `precio_antiguo` y el historial de `carrito_virtual.estado`. La tabla `sesion_web` no tiene endpoints (no se solicitó sesión). El modelo `clienteModel` cubre su tabla y valida la existencia del cliente al crear un carrito.
 
+> **Actualización (ver §58):** desde la fase 3 sí existe la tabla de líneas **`orden_detalle`** y `carritoModel.registrarCompra()`, que persiste cabecera + detalles con transacción. Los endpoints legacy `agregarProducto`/`quitarProducto` siguen ajustando solo `monto_total` del carrito activo (no persisten líneas); el flujo de compra real es `POST /api/ordenes`.
+
 **Registro en `app.js`:** routers importados y montados con `app.use()`, conservando el middleware 404 “Ruta no encontrada” **después** de todas las rutas y el manejador de errores al final. Puerto y credenciales intactos; CommonJS.
 
 **Verificación:** `node --check` sobre `app.js` y los 12 archivos nuevos → 13/13 OK.
@@ -959,3 +961,127 @@ Antes, al ingresar manualmente un código de 13 dígitos inexistente (p. ej. `99
 **Archivos modificados:** `frontend/app.js` y `frontend/styles.css` (un único archivo de estilos, 1 línea). `index.html`, backend, `sw.js`, `manifest.json` y módulos Tobi sin cambios.
 
 **Verificación:** `node --check frontend/app.js` OK; mensaje rojo correcto para ingreso manual y cámara; “Lectura inestable” ya no reemplaza el mensaje de inmediato.
+
+---
+
+## 58. 🧾 Registro de compras con detalles y transacción (`POST /api/ordenes`) — Fase 3
+
+Con las tablas base ya creadas, la compra dejó de ser un simple `monto_total` en el carrito y pasó a persistirse como una **compra completa**: cabecera en `carrito_virtual` + líneas en la nueva tabla `orden_detalle`, todo dentro de **una sola transacción SQL**. Los precios, subtotales y el total se calculan en PostgreSQL; el backend **ignora** cualquier precio o total enviado por el cliente. (Documenta el commit `fase 3: registrar compras y detalles con transaccion`.)
+
+**Esquema (`backend/database/init.sql`):**
+
+| Cambio | Detalle |
+|--------|---------|
+| Nueva tabla `orden_detalle` | `id`, `id_carrito` → `carrito_virtual(id)` (`ON DELETE CASCADE`), `codigo_barras` → `producto(codigo_barras)` (`ON DELETE RESTRICT`), `cantidad INTEGER CHECK (> 0)`, `precio_unitario NUMERIC(10,2)`, `subtotal NUMERIC(10,2)` |
+| Índices nuevos | `idx_orden_detalle_id_carrito`, `idx_orden_detalle_codigo_barras` |
+| Cliente de demostración | `INSERT ... ('99999999','Cliente Demo','demo@scan-go.local') ON CONFLICT (dni) DO NOTHING` (id 1; requerido por la FK) |
+
+**Modelo** — `backend/src/models/carritoModel.js`:
+
+| Función | Comportamiento |
+|---------|----------------|
+| `registrarCompra(idCliente, items)` | `pool.connect()` (cliente único) → `BEGIN` → valida cliente (`SELECT ... WHERE id=$1`; si no existe → `CLIENTE_NO_ENCONTRADO`) → `INSERT` cabecera en `carrito_virtual` con `monto_total=0` → por cada item lee el **precio real** de `producto` (si no existe → `PRODUCTO_NO_ENCONTRADO`) e inserta el detalle con `subtotal = $4::numeric * $3::integer` (aritmética decimal **en SQL**) → total = `COALESCE(SUM(subtotal),0)` y `UPDATE` de la cabecera → `COMMIT`. Ante cualquier error → `ROLLBACK`; `release()` siempre en `finally` |
+| `ErrorDatos` | Error de negocio controlado (`código`, `mensaje`, extra) para mapear a **400/404** sin exponer detalles internos de PostgreSQL |
+
+**Controlador** — `backend/src/controllers/carritoController.js` (`registrarCompra`):
+
+| Validación | Respuesta |
+|------------|-----------|
+| `idCliente \| usuarioId` entero > 0 | `400 idCliente invalido` |
+| `items` arreglo no vacío | `400 La compra debe contener al menos un producto` |
+| cada item es objeto | `400 Cada item debe ser un objeto valido` |
+| `codigoBarras` string no vacío | `400 El codigo de barras es obligatorio` |
+| `cantidad` entero > 0 (`Number.isInteger`) | `400 La cantidad debe ser un entero mayor que cero` |
+| códigos repetidos | se **agrupan** sumando cantidades antes de persistir |
+| éxito | **201** `{ success:true, message:'Compra registrada correctamente', data:{ compraId, total, items } }` |
+| producto inexistente | **404** `{ success:false, message:'Producto no encontrado', codigoBarras }` |
+| cliente inexistente | **404** `Cliente no encontrado` |
+
+**Ruta** — `backend/src/routes/ordenRoutes.js`: `router.post('/', carritoController.registrarCompra)` (montado en `app.use('/api/ordenes', ordenRoutes)`).
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/api/ordenes` | Registra la compra completa (cabecera + detalles, transacción) |
+
+**Archivos modificados:** `backend/database/init.sql`, `backend/src/models/carritoModel.js`, `backend/src/controllers/carritoController.js`, `backend/src/routes/ordenRoutes.js`.
+
+**Verificación:** `node --check` OK; compra válida → **201** con total recalculado; carrito vacío / cantidad `0`, negativa o decimal / `codigoBarras` no string → **400**; producto o cliente inexistente → **404**; una compra fallida no deja cabecera ni detalles (rollback comprobado).
+
+---
+
+## 59. 💳 Pago del frontend conectado al backend (botón *Pagar ahora*) — Fase 4
+
+El botón **Pagar ahora** dejó de simular la compra: ahora la registra en el backend **antes** de tocar el carrito y usa como fuente de verdad el total confirmado por el servidor. (Documenta el commit `fase 4: conectar pago del frontend con backend`.)
+
+**Frontend — `frontend/app.js`:**
+
+| Cambio | Detalle |
+|--------|---------|
+| `const USUARIO_DEMO_ID = 1` | id del cliente demo sembrado en `init.sql` (dni `99999999`) |
+| `let pagoEnProceso = false` | **protección anti doble pago**: `payNow()` y `registrarCompra()` salen si ya hay un envío en curso; mientras dura, `#btnPayNow` queda `disabled` con texto “Procesando...” y se restaura en `finally` |
+| `async registrarCompra(carrito = cart)` | transforma el carrito `{ codigo: cantidad }` en `items: [{ codigoBarras, cantidad }]` (solo códigos no vacíos y cantidades enteras > 0); `POST ${API_BASE_URL}/api/ordenes` con `{ usuarioId: USUARIO_DEMO_ID, items }`; un único `response.json()`; éxito **solo** si HTTP 2xx + `success===true` + `data.compraId` presente; devuelve `data` o `null` (**nada** se guarda localmente si falla) |
+| `async payNow()` | 1) registra la compra en el backend; si falla (red/400/404/500) el carrito se conserva intacto; 2) el **total confiable** es `compra.total` del servidor (si no viene, respaldo a `t.total`); 3) **solo** con la compra confirmada limpia el carrito y guarda la orden, con `compraId` incluido en el ticket |
+
+**Comportamiento:** backend apagado o error de red → `toast("No se pudo conectar con el servidor. Tu carrito se conserva.")` y no se registra ninguna compra (ni local ni remota).
+
+**Frontend nunca envía precios ni totales como fuente de verdad:** el cuerpo solo lleva `usuarioId` y `items` con `codigoBarras`/`cantidad`.
+
+**Archivos modificados:** solo `frontend/app.js`.
+
+**Verificación:** `node --check frontend/app.js` OK; compra válida → **201** y el ticket usa el total del servidor; doble clic durante el envío no duplica la compra; backend apagado → aviso y carrito intacto.
+
+---
+
+## 60. 🕘 Historial de compras desde PostgreSQL con respaldo local
+
+El historial pasó a leerse del servidor (compras reales con sus productos) y, si el backend no responde, se conserva el respaldo local del navegador. **Cambios pendientes de commit** en el árbol de trabajo.
+
+**Backend — `backend/src/models/carritoModel.js`** (`listarOrdenesPorCliente`, usado por `GET /api/historial/cliente/:idCliente` y `GET /api/ordenes/cliente/:idCliente`):
+
+| Cambio | Detalle |
+|--------|---------|
+| Cabeceras | `carrito_virtual` con `estado <> 'activo'`, ordenadas `ORDER BY fecha DESC, id DESC` (compra más reciente primero) |
+| Detalles agrupados | **segunda consulta** `orden_detalle JOIN producto WHERE id_carrito = ANY($1::int[])` (consulta parametrizada con arreglo), agrupada en memoria por `id_carrito` |
+| **Sin N+1** | 1 consulta de cabeceras + 1 consulta de detalles para todas las compras del cliente (no una por compra) |
+| Forma de cada compra | `{ compraId, idCliente, fecha, total, estado, items:[ { codigoBarras, nombre, cantidad, precioUnitario, subtotal } ] }` |
+
+**Frontend — `frontend/app.js`:**
+
+| Cambio | Detalle |
+|--------|---------|
+| `let historialRemoto = null` / `let historialCargando = false` | estado del historial remoto (`null` = aún no cargado o servidor no disponible) |
+| `async cargarHistorialRemoto()` | `GET ${API_BASE_URL}/api/historial/cliente/${USUARIO_DEMO_ID}`; si HTTP OK + `success:true` + `data` arreglo → `historialRemoto = data`; sin backend → se conserva el respaldo local (`tottus_history`) |
+| `formatearFechaHistorial(fecha)` | fecha `es-PE` segura |
+| `historialVista()` | normaliza ambas fuentes (remota y local) al mismo modelo que pinta la UI (`ticketId`, `date`, `total`, `qty`, `method`) |
+
+**Comportamiento:** con backend → historial real del servidor; backend apagado → historial local del navegador; la compra recién pagada aparece en el historial del servidor (misma fuente, PostgreSQL).
+
+**Archivos modificados:** `backend/src/models/carritoModel.js` y `frontend/app.js` (sin commit).
+
+**Verificación:** `node --check` OK en ambos; `GET /api/historial/cliente/1` → **200**, `data` arreglo ordenado de la más reciente a la más antigua, con `items`, cantidades, precios unitarios, subtotales y total correctos; cliente sin compras → **200** con `data: []`; con backend apagado se mantiene el respaldo local.
+
+---
+
+## 61. ✅ Auditoría final del backend (validación estática + pruebas en vivo)
+
+Última fase de cierre del backend: revisión estática, `node --check` y pruebas reales contra PostgreSQL, **sin cambios de código** (no hubo defectos que corregir en el flujo principal).
+
+| Comprobación | Resultado |
+|--------------|-----------|
+| `node --check` (app.js, db.js, 5 rutas, 4 controladores, 3 modelos) | **14/14 OK** |
+| Variables de entorno requeridas (`DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `PORT`) | todas **definidas** (sin mostrar valores) |
+| `backend/.env` seguido por Git | **No** (`git ls-files backend/.env` vacío; `backend/.gitignore` incluye `.env`) |
+| `.env.example` | sin credenciales reales (`DB_PASSWORD=` vacío) |
+| Productos: `GET /api/products` / alias `/api/productos` / búsqueda existente / inexistente / inválido | **200 / 200 / 200 / 404 / 400** |
+| `codigoBarras` tratado como **string**, consultas parametrizadas | ✔ |
+| Compras: válida / carrito vacío / cantidad 0 / negativa / decimal / producto inexistente / cliente inexistente / precio manipulado / varios + duplicado | **201 / 400 / 400 / 400 / 400 / 404 / 404 / 201 (total recalculado) / 201** |
+| Transacción `BEGIN`/`COMMIT`/`ROLLBACK` + `release()` en `finally`; compra fallida sin registros parciales | ✔ (hueco de secuencia sin fila; 0 huérfanos; total = suma de subtotales) |
+| Historial: con compras / sin compras / id inválido | **200 / 200 (`data: []`) / 400** |
+| Ruta inexistente | **404** |
+| Regresión `GET /api/products` tras todas las pruebas | **200** (14 productos) |
+| CORS en desarrollo y límite de cuerpo JSON (default 100 KB → **413**) | ✔ |
+| SQL por concatenación / errores SQL expuestos / contraseñas en archivos versionados | ninguno |
+
+**Compras de prueba creadas** (datos de prueba que pueden permanecer): `id 21` (10.40), `id 23` (5.20), `id 24` (32.90). El intento fallido consumió la secuencia `id 22` sin crear registro.
+
+**Resultado:** **APROBADO CON OBSERVACIONES**. Sin errores comprobados en el backend principal y **sin archivos modificados** por la auditoría. Observaciones no bloqueantes (mejoras futuras, no implementadas): el parseo de `cantidad` en los endpoints legacy de carrito (`Number.parseInt(x,10) || 1`) trunca decimales; `express.json()` no declara un límite explícito (usa el default de 100 KB); CORS abierto (`*`) apto solo para desarrollo; no existe `.gitignore` en la raíz (no impide nada porque `backend/.gitignore` protege `backend/.env`); autenticación/tokens y rate limiting quedan como trabajo futuro.

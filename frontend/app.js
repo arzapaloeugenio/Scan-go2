@@ -165,6 +165,48 @@ function saveHistoryEntry(entry) {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 20)));
   } catch { /* noop */ }
 }
+// Historial remoto (PostgreSQL): el backend expone el historial por cliente en
+// GET /api/historial/cliente/:idCliente (con sus productos). Se prefiere el
+// servidor; si la API no responde, se conserva el respaldo local (tottus_history).
+// `historialRemoto === null` = aún no cargado o servidor no disponible.
+let historialRemoto = null;
+let historialCargando = false;
+async function cargarHistorialRemoto() {
+  if (historialCargando) return;
+  historialCargando = true;
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/historial/cliente/${USUARIO_DEMO_ID}`);
+    let payload = null;
+    try { payload = await response.json(); } catch { payload = null; }
+    if (response.ok && payload && payload.success === true && Array.isArray(payload.data)) {
+      historialRemoto = payload.data;
+    }
+  } catch { /* sin backend: se mantiene el respaldo local */ }
+  finally {
+    historialCargando = false;
+    renderHistory();
+  }
+}
+function formatearFechaHistorial(fecha) {
+  try {
+    const d = new Date(fecha);
+    if (isNaN(d)) return String(fecha || "");
+    return d.toLocaleString("es-PE");
+  } catch { return String(fecha || ""); }
+}
+// Normaliza ambas fuentes (remota y local) al mismo modelo que pinta la UI.
+function historialVista() {
+  if (historialRemoto !== null) {
+    return historialRemoto.map((c) => ({
+      ticketId: c.compraId != null ? `N.° ${c.compraId}` : "Compra",
+      date: formatearFechaHistorial(c.fecha),
+      total: Number(c.total) || 0,
+      qty: (c.items || []).reduce((s, i) => s + (Number(i.cantidad) || 0), 0),
+      method: c.estado || "",
+    }));
+  }
+  return getHistory();
+}
 function beep(ok = true) {
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -993,7 +1035,7 @@ async function onScannedCode(rawCode) {
 function renderHistory() {
   const el = $("historyList");
   if (!el) return;
-  const h = getHistory();
+  const h = historialVista();
   if (!h.length) {
     el.innerHTML = `<p class="muted small">Sin compras aún. Tu boleta guardada aparecerá aquí.</p>`;
     return;
@@ -1497,7 +1539,7 @@ function validateSalida(inputCode) {
     `<pre>TOTTUS SCAN & GO ✅ SALIDA AUTORIZADA\nRUC demo: 20100123456 | ${order.ticketId}\nCliente: ${user.name.replace(/</g, "&lt;")}${dniTxt}\nPagado: ${money(order.total)} (${order.method}) en ${order.paySecs || 0}s\nSubtotal: ${money(order.subtotal)} | IGV: ${money(order.igv)}\nCaja: validada · Seguridad: validada\nItems: ${order.qty}\nPresenta esta pantalla al salir.</pre>`;
   $("payStep4").scrollIntoView({ behavior: "smooth" });
   saveHistoryEntry({ ticketId: order.ticketId, date: new Date().toLocaleString("es-PE"), total: order.total, qty: order.qty, method: order.method });
-  renderHistory();
+  cargarHistorialRemoto();
   clearOrder(); // compra cerrada; QRs quedan invalidados (también en storage)
   confettiBurst();
   botSay(`🎉 <b>¡FELICIDADES POR TU COMPRA, ${firstName()}!</b> 🥳 Seguridad ya validó tu salida: puedes retirarte. Cada compra con Scan &amp; Go te ahorra la cola... ¡te espero en tu próxima visita! 💚`, 16000);
@@ -1513,6 +1555,7 @@ async function init() {
   renderCodesHelp();
   renderAll();
   updateAuthUI();
+  cargarHistorialRemoto();
   // Estado inicial del escáner según el CDN (no bloquea el resto de la app).
   updateScannerAvailability();
   const cdnScript = document.getElementById("quagga2-cdn");

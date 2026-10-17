@@ -1,8 +1,8 @@
 // Modelo de la tabla `carrito_virtual`.
 // Un carrito activo representa la compra en curso; al cambiar su estado
 // (por ejemplo 'confirmado') pasa a comportarse como una orden/historial.
-// Nota: el esquema no define una tabla de lineas de detalle, por lo que el
-// estado persistente del carrito es `monto_total` + `estado`.
+// Las lineas de detalle viven en `orden_detalle` (id_carrito ->
+// carrito_virtual.id, codigo_barras -> producto.codigo_barras).
 
 const pool = require('../../config/db');
 
@@ -59,15 +59,52 @@ async function listarPorCliente(idCliente) {
   return rows.map(normalizar);
 }
 
-// Ordenes/historial: carritos que dejaron de estar activos.
+// Ordenes/historial: carritos que dejaron de estar activos, con sus productos.
+// Evita el problema N+1: 1 consulta para las cabeceras + 1 consulta de detalles
+// para todos los id_carrito del cliente (JOIN a `producto`), agrupando en memoria.
 async function listarOrdenesPorCliente(idCliente) {
   const { rows } = await pool.query(
     `SELECT ${COLUMNAS} FROM carrito_virtual
      WHERE id_cliente = $1 AND estado <> 'activo'
-     ORDER BY fecha DESC`,
+     ORDER BY fecha DESC, id DESC`,
     [idCliente]
   );
-  return rows.map(normalizar);
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const idsCarrito = rows.map((fila) => fila.id);
+  const detalles = await pool.query(
+    `SELECT d.id_carrito, d.codigo_barras, p.nombre, d.cantidad,
+            d.precio_unitario, d.subtotal
+     FROM orden_detalle d
+     JOIN producto p ON p.codigo_barras = d.codigo_barras
+     WHERE d.id_carrito = ANY($1::int[])
+     ORDER BY d.id`,
+    [idsCarrito]
+  );
+
+  const itemsPorCarrito = new Map();
+  for (const fila of detalles.rows) {
+    const items = itemsPorCarrito.get(fila.id_carrito) || [];
+    items.push({
+      codigoBarras: fila.codigo_barras,
+      nombre: fila.nombre,
+      cantidad: fila.cantidad,
+      precioUnitario: Number(fila.precio_unitario),
+      subtotal: Number(fila.subtotal),
+    });
+    itemsPorCarrito.set(fila.id_carrito, items);
+  }
+
+  return rows.map((fila) => ({
+    compraId: fila.id,
+    idCliente: fila.id_cliente,
+    fecha: fila.fecha,
+    total: Number(fila.monto_total),
+    estado: fila.estado,
+    items: itemsPorCarrito.get(fila.id) || [],
+  }));
 }
 
 async function actualizarMonto(id, montoTotal) {
