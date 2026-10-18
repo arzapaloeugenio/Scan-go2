@@ -2,7 +2,7 @@
 
 > Documento de trabajo: segunda iteración del proyecto **Tottus Scan & Go** (Universidad Norbert Wiener – Software 1, Proyecto Integrador).
 > Fecha: septiembre 2026 · Equipo: Arzapalo, Alva, Cabrejos, Condori · Ciclo: IS4M1.
-> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–28 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio, revisión final y visibilidad nav/TOBI solo en dashboard). **Sexta iteración (TOBI conversacional, octubre 2026):** secciones 39–50 (saludo animado y saltito, chat aparte, historial, saludo con nombre, alergias, productos frecuentes, recetas con filtro, descuentos del día, comprensión, alerta en catálogo, lista de compras y sugerencias). **Séptima iteración (backend Node/Express/PostgreSQL, octubre 2026):** secciones 53–54 documentan la API REST (modelos, controladores y rutas sobre las tablas de `backend/database/init.sql`) y la corrección de la ruta `/api/products`; §55–§57 la integración del catálogo y la búsqueda por código del frontend con la API. **Cierre del backend (octubre 2026):** §58–§61 documentan el registro de compras con detalles y transacción (`orden_detalle`, `POST /api/ordenes`), la conexión del pago del frontend (botón *Pagar* + protección anti doble pago), el historial desde PostgreSQL con respaldo local y la auditoría final del backend. Todo el código se genera solo con **Opencode**.
+> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–28 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio, revisión final y visibilidad nav/TOBI solo en dashboard). **Sexta iteración (TOBI conversacional, octubre 2026):** secciones 39–50 (saludo animado y saltito, chat aparte, historial, saludo con nombre, alergias, productos frecuentes, recetas con filtro, descuentos del día, comprensión, alerta en catálogo, lista de compras y sugerencias). **Séptima iteración (backend Node/Express/PostgreSQL, octubre 2026):** secciones 53–54 documentan la API REST (modelos, controladores y rutas sobre las tablas de `backend/database/init.sql`) y la corrección de la ruta `/api/products`; §55–§57 la integración del catálogo y la búsqueda por código del frontend con la API. **Cierre del backend (octubre 2026):** §58–§61 documentan el registro de compras con detalles y transacción (`orden_detalle`, `POST /api/ordenes`), la conexión del pago del frontend (botón *Pagar* + protección anti doble pago), el historial desde PostgreSQL con respaldo local y la auditoría final del backend. **Octava iteración (ingreso por DNI + Google «próximamente», octubre 2026):** §62 documenta el ingreso por DNI contra el backend real, la desactivación segura de Google (modal propio, sin OAuth en el frontend), el modo demostración claramente etiquetado y la validación QA de la Etapa 3. Todo el código se genera solo con **Opencode**.
 
 Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 
@@ -387,6 +387,8 @@ Solo acceso/registro. Login (`#loginCard`), demo, catálogo, escáner, carrito, 
 
 Sin reconstruir acceso. Login, registro, validaciones, 14 productos, lector, carrito, pago y TOBI intactos.
 
+> **Nota de vigencia (§62):** el botón pasó a llamarse **«Ver demostración»** y su distintivo **«Modo demostración»**; la etiqueta `Modo demo` descrita aquí quedó superada.
+
 | Cambio | Dónde |
 |--------|-------|
 | Sesión demo solo en memoria `let demoMode=false`; `enterDemo()` activa el flag y reutiliza `updateAuthUI()` + `showView("home")` (misma vía que abre la tienda al autenticarse), sin abrir login/registro ni pedir datos | `app.js` |
@@ -439,6 +441,8 @@ Solo diseño. Login, registro y “Probar demo” funcionan igual; sin cambios d
 ## 25. 🔑 Bienvenida con tres botones: Iniciar sesión / Continuar con Google / Probar demo
 
 Sin “Crear cuenta” independiente en la bienvenida. Lógica de login, registro, demo, validaciones y TOBI intacta.
+
+> **Nota de vigencia (§62):** «Probar demo» hoy es **«Ver demostración»**; el botón «Continuar con Google» se convirtió después en el ícono «G» `#btnGoogleAccess` (§52) que abre un **modal propio**, sin OAuth (§62).
 
 | Cambio | Dónde |
 |--------|-------|
@@ -836,6 +840,8 @@ El ícono decorativo aislado de §51 se convirtió en un `button` real, circular
 
 **Sin integración real:** falta OAuth de Google (Client ID, SDK/redirect, validación en backend y sesión). El botón es una respuesta visible controlada, no un login.
 
+> **Nota de vigencia (§62):** el `toast` de `handleGoogleAccess()` se reemplazó por un **modal propio** `#googleModal` (cierre con «Entendido», ✕, clic en el fondo y `Escape`; foco gestionado). «Probar demo» hoy es **«Ver demostración»**.
+
 **Verificación:** botón real con foco teclado (Enter/Espacio) y `aria-label`; un clic = una acción; `node --check` OK; PC conserva dos secciones con grupo centrado y `gap:12px`; `320/375/430` sin solapes ni scroll-x.
 
 ---
@@ -1085,3 +1091,26 @@ El historial pasó a leerse del servidor (compras reales con sus productos) y, s
 **Compras de prueba creadas** (datos de prueba que pueden permanecer): `id 21` (10.40), `id 23` (5.20), `id 24` (32.90). El intento fallido consumió la secuencia `id 22` sin crear registro.
 
 **Resultado:** **APROBADO CON OBSERVACIONES**. Sin errores comprobados en el backend principal y **sin archivos modificados** por la auditoría. Observaciones no bloqueantes (mejoras futuras, no implementadas): el parseo de `cantidad` en los endpoints legacy de carrito (`Number.parseInt(x,10) || 1`) trunca decimales; `express.json()` no declara un límite explícito (usa el default de 100 KB); CORS abierto (`*`) apto solo para desarrollo; no existe `.gitignore` en la raíz (no impide nada porque `backend/.gitignore` protege `backend/.env`); autenticación/tokens y rate limiting quedan como trabajo futuro.
+
+---
+
+## 62. 🆔🔵 Ingreso por DNI + Google «próximamente» (Etapa 3) — revisión de seguridad y QA
+
+Fase de cierre del acceso: el ingreso por DNI queda **activo contra el backend real**, Google queda **preparado en el backend pero desactivado en el frontend** (sin OAuth y sin selector falso) y la demo queda **claramente etiquetada**. **Sin cambios** en backend, base de datos, Vercel ni Docker.
+
+| Cambio | Dónde |
+|--------|-------|
+| Ingreso por DNI (`#dniLoginForm`): limpia a solo dígitos (máx. 8), valida exactamente 8 (evita solicitudes vacías), deshabilita `#btnDniLogin` + «Verificando…» mientras consulta y lo reactiva al terminar | `index.html`, `app.js` |
+| Consulta real `POST /api/clientes/dni` (`{dni}`, `API_BASE_URL`): **200** identifica (`id`,`nombre`,`dni`); **404** «El DNI no está registrado…»; error de red → mensaje controlado, se queda en el login y **no** crea sesión | `app.js` |
+| `localStorage['tottus_user']` guarda el `id` real del backend; `currentClienteId()` usa ese `id` (o el cliente demo) para historial y registro de compra | `app.js` |
+| Google «próximamente»: `#btnGoogleAccess` **no** llama a `POST /api/auth/google`, **no** carga Google Identity Services y **no** pide datos; abre un **modal propio de Scan & Go** `#googleModal` (`#btnCloseGoogleModal`, `#btnGoogleModalOk`), cerrable con «Entendido», ✕, clic en el fondo y `Escape`, con `role="dialog"`, `aria-modal` y foco gestionado (devuelve el foco al disparador) | `index.html`, `app.js`, `styles.css` |
+| Eliminado el aviso en línea `#googleNotice` (y `#btnCloseGoogleNotice`) con su `handleGoogleAccess()` y su auto-cierre | `index.html`, `app.js` |
+| Renombres de la demo: `#btnDemo` «Probar demo» → **«Ver demostración»**; `#demoBadge` «Modo demo» → **«Modo demostración»**; texto del acceso por correo → «Acceso de demostración (no crea cuenta ni guarda tus datos)» | `index.html` |
+| Acceso por correo neutralizado: ya **no** fabrica un perfil local ni escribe `tottus_user`; valida y entra a `enterDemo()` sin guardar correo, contraseña ni perfil | `app.js` |
+| Limpieza defensiva al iniciar: `limpiarDatosFalsosGoogle()` (borra `scango_google_accounts` y claves `scango_google_*`) y `limpiarPerfilLocalInventado()` (borra `tottus_user` sin `id` de backend); no tocan carrito, historial, pedido ni perfil por DNI | `app.js` |
+| Mensaje 404 del DNI → «…usa «Ver demostración»»; respuesta de TOBI sobre demo/cuenta ahora menciona «Ver demostración» y el ingreso por DNI | `app.js`, `tobi-chat.js` |
+| Sin cambios en backend (`POST /api/auth/google` intacto: exige `credential` real), base de datos, Vercel ni Docker | — |
+
+**Verificación (QA real, 2026-10-18):** health `GET /` OK; DNI existente **200** (`Cliente Demo`, dni 99999999), inexistente **404**, formato inválido **400**; con el backend apagado el frontend muestra «No se pudo conectar con el servidor…» y **no** crea sesión; recuperación correcta tras reiniciar el backend; `POST /api/auth/google` sin `credential` → **400** (OAuth real pospuesto por falta de `GOOGLE_CLIENT_ID`); `node --check` OK; cámara/lector verificados manualmente en Vercel.
+
+**Sin efectos secundarios:** no se crearon ni borraron clientes, órdenes ni datos durante la validación.

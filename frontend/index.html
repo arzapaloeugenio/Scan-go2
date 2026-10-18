@@ -17,7 +17,7 @@
         <div>
           <img src="img/Logo_Tottus.png" class="main-logo" alt="Tottus Scan & Go" />
           <small id="headerUser">Hola, cliente</small>
-          <small id="demoBadge" class="demo-badge" hidden>Modo demo</small>
+          <small id="demoBadge" class="demo-badge" hidden>Modo demostración</small>
         </div>
       </div>
       <button class="icon-btn cart-btn" id="btnGoCart" aria-label="Ver carrito">
@@ -50,12 +50,8 @@
         <div class="hero-auth">
           <button type="button" id="btnGoogleAccess" class="btn-google-circle" aria-label="Continuar con Google (función próximamente)"><i class="fa-brands fa-google" aria-hidden="true"></i></button>
           <button type="button" class="hero-btn hero-btn-primary" id="btnGoLogin" aria-expanded="false" aria-controls="loginCard">Iniciar sesión</button>
-          <button type="button" class="hero-btn hero-btn-tertiary" id="btnDemo">Probar demo</button>
+          <button type="button" class="hero-btn hero-btn-tertiary" id="btnDemo">Ver demostración</button>
         </div>
-        <p id="googleNotice" class="hero-notice" role="status" aria-live="polite" hidden>
-          <span>El inicio de sesión con Google estará disponible próximamente. Por ahora, ingresa con tu DNI.</span>
-          <button type="button" class="hero-notice-close" id="btnCloseGoogleNotice" aria-label="Cerrar aviso">✕</button>
-        </p>
       </div>
       <div id="loginCard" class="card auth-card" hidden aria-hidden="true">
         <h2>Iniciar sesión</h2>
@@ -69,7 +65,7 @@
           <button type="submit" class="btn-primary" id="btnDniLogin">Ingresar con DNI</button>
         </form>
         <p class="demo-divider">o</p>
-        <p class="muted small">Acceso con correo (demostración)</p>
+        <p class="muted small">Acceso de demostración (no crea cuenta ni guarda tus datos)</p>
         <form id="emailLoginForm" novalidate>
           <label for="authEmail">
             Correo electrónico
@@ -445,6 +441,18 @@
       <h3 id="fastLimitTitle">⚠️ Compra rápida</h3>
       <p>Límite de compras rápidas alcanzado (40 artículos). Dirígete a una caja tradicional para procesar esta compra.</p>
       <button class="btn-primary" id="btnCloseFastModal">Entendido</button>
+    </div>
+  </div>
+
+  <!-- AVISO PROPIO DE SCAN & GO: acceso con Google próximamente.
+       Modal nativo de la app (no imita el selector oficial de Google, no pide
+       correo, contraseña ni nombre, y no crea ninguna cuenta). -->
+  <div id="googleModal" class="modal-overlay" hidden>
+    <div class="modal-card google-modal-card" role="dialog" aria-modal="true" aria-labelledby="googleModalTitle" aria-describedby="googleModalDesc">
+      <button type="button" class="modal-close" id="btnCloseGoogleModal" aria-label="Cerrar aviso de Google">✕</button>
+      <h3 id="googleModalTitle">Acceso con Google próximamente</h3>
+      <p id="googleModalDesc">El backend ya está preparado para validar cuentas de Google. Esta opción se habilitará cuando se configuren las credenciales oficiales. Por ahora, continúa con tu DNI.</p>
+      <button class="btn-primary" id="btnGoogleModalOk">Entendido</button>
     </div>
   </div>
 

@@ -44,7 +44,7 @@ function getTobiReply(text) {
   if (has("edad", "dni", "18", "licor", "cerveza", "alcohol"))
     return "Los licores son solo para mayores de 18: se validan con tu fecha de nacimiento al registrarte. 🔞";
   if (has("demo", "cuenta", "registro", "sesion", "google"))
-    return "Puedes Probar demo sin registrarte, o crear tu cuenta con nombre, correo, DNI y nacimiento. El acceso con Google estará disponible próximamente.";
+    return "Puedes entrar con «Ver demostración» (modo de prueba, sin registrarte) o ingresar con tu DNI si ya eres cliente. El acceso con Google estará disponible próximamente.";
   if (has("quien eres", "tobi", "robot"))
     return "Soy Tobi 🤖, el robot guía de Tottus Scan & Go. Te acompaño a comprar sin colas: escaneo, carrito, pago y salida.";
   return "Mmm, no te entendí del todo. 🤔 Pregúntame por: escanear, carrito, pagar, caja, salida, ofertas o tu cuenta, y te oriento paso a paso.";

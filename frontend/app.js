@@ -146,6 +146,37 @@ let searchTerm = "";
 let scannerRunning = false;
 // Sesión visual de demostración: solo memoria, sin cuenta ni credenciales.
 let demoMode = false;
+// Elemento que abrió el aviso de Google: para devolverle el foco al cerrar.
+let googleModalTrigger = null;
+
+// Limpieza defensiva (Etapa 3): borra únicamente restos de un selector o
+// cuentas falsas de Google que versiones anteriores pudieran haber dejado en
+// el navegador. NO toca carrito, configuración, historial ni perfil legítimo.
+function limpiarDatosFalsosGoogle() {
+  try {
+    const claves = ["scango_google_accounts"];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.indexOf("scango_google_") === 0) claves.push(key);
+    }
+    claves.forEach((k) => { try { localStorage.removeItem(k); } catch { /* noop */ } });
+  } catch { /* storage bloqueado */ }
+}
+
+// Perfil local inventado (Etapa 3): versiones anteriores guardaban en
+// "tottus_user" un perfil de correo (sin id del backend) y lo presentaban como
+// cliente registrado. Ese perfil no es una sesión autenticada: se retira para
+// volver al login. Los perfiles identificados por DNI (con id numérico real)
+// NO se tocan, y el modo demostración nunca se persiste.
+function limpiarPerfilLocalInventado() {
+  try {
+    const raw = localStorage.getItem("tottus_user");
+    if (!raw) return;
+    const u = JSON.parse(raw);
+    const tieneIdBackend = !!(u && Number.isInteger(u.id) && u.id > 0);
+    if (!tieneIdBackend) localStorage.removeItem("tottus_user");
+  } catch { /* perfil corrupto: se ignora */ }
+}
 // Estado del pago/retiro
 let order = null; // { ticketId, method, total, items, subtotal, igv, saving, qty, caja:{code,token,exp,used}, salida:{...}, status }
 let qrTimer = null;
@@ -1570,6 +1601,8 @@ function validateSalida(inputCode) {
 
 // ---------- INIT ----------
 async function init() {
+  limpiarDatosFalsosGoogle();
+  limpiarPerfilLocalInventado();
   loadState();
   loadOrder();
   // Catálogo: intenta la API y espera el resultado antes de renderizar.
@@ -1635,7 +1668,7 @@ async function init() {
     });
   }
 
-  // Probar demo: reutiliza enterDemo (misma vía que abre la tienda). Sin formularios ni credenciales.
+  // Ver demostración: reutiliza enterDemo (misma vía que abre la tienda). Sin formularios ni credenciales.
   if (!window._demoBound) {
     window._demoBound = true;
     $("btnDemo").addEventListener("click", enterDemo);
@@ -1643,26 +1676,43 @@ async function init() {
 
   // Acceso con Google: función PRÓXIMAMENTE (Etapa 3).
   // No se llama a POST /api/auth/google, no se carga Google Identity Services,
-  // no se abre ningún formulario y no se simula sesión ni cuenta: solo se
-  // muestra un aviso breve e integrado, cerrable y con auto-cierre accesible.
-  function handleGoogleAccess() {
-    const notice = $("googleNotice");
-    if (!notice) {
-      toast("El inicio de sesión con Google estará disponible próximamente. Por ahora, ingresa con tu DNI.");
+  // no se abre ningún formulario y no se simula sesión ni cuenta. Solo se
+  // muestra un modal PROPIO de Scan & Go (no imita el selector oficial de
+  // Google, no pide correo, contraseña ni nombre) con la función próximamente.
+  function openGoogleModal() {
+    const modal = $("googleModal");
+    if (!modal) {
+      toast("Acceso con Google próximamente. Por ahora, continúa con tu DNI.");
       return;
     }
-    notice.hidden = false;
-    clearTimeout(notice._timer);
-    notice._timer = setTimeout(() => { notice.hidden = true; }, 7000);
+    googleModalTrigger = document.activeElement;
+    modal.hidden = false;
+    const ok = $("btnGoogleModalOk");
+    if (ok) setTimeout(() => ok.focus({ preventScroll: true }), 30);
+  }
+  function closeGoogleModal() {
+    const modal = $("googleModal");
+    if (!modal || modal.hidden) return;
+    modal.hidden = true;
+    const trigger = googleModalTrigger || $("btnGoogleAccess");
+    googleModalTrigger = null;
+    if (trigger && typeof trigger.focus === "function") trigger.focus({ preventScroll: true });
   }
   if (!window._googleAccessBound) {
     window._googleAccessBound = true;
     const btnGoogleAccess = $("btnGoogleAccess");
-    if (btnGoogleAccess) btnGoogleAccess.addEventListener("click", handleGoogleAccess);
-    const btnCloseGoogleNotice = $("btnCloseGoogleNotice");
-    if (btnCloseGoogleNotice) btnCloseGoogleNotice.addEventListener("click", () => {
-      const notice = $("googleNotice");
-      if (notice) { notice.hidden = true; clearTimeout(notice._timer); }
+    if (btnGoogleAccess) btnGoogleAccess.addEventListener("click", openGoogleModal);
+    const btnGoogleModalOk = $("btnGoogleModalOk");
+    if (btnGoogleModalOk) btnGoogleModalOk.addEventListener("click", closeGoogleModal);
+    const btnCloseGoogleModal = $("btnCloseGoogleModal");
+    if (btnCloseGoogleModal) btnCloseGoogleModal.addEventListener("click", closeGoogleModal);
+    const googleModal = $("googleModal");
+    if (googleModal) googleModal.addEventListener("click", (e) => {
+      if (e.target === googleModal) closeGoogleModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      const modal = $("googleModal");
+      if (e.key === "Escape" && modal && !modal.hidden) closeGoogleModal();
     });
   }
 
@@ -1705,7 +1755,7 @@ async function init() {
 
       // 9) Mensaje claro si el DNI no está registrado.
       if (response.status === 404) {
-        setDniLoginError("El DNI no está registrado. Verifica el número o usa «Probar demo».");
+        setDniLoginError("El DNI no está registrado. Verifica el número o usa «Ver demostración».");
         return;
       }
       if (!response.ok) {
@@ -1896,24 +1946,13 @@ async function init() {
       }
       $("authPass").setAttribute("aria-invalid", String(!passOk));
       if (!emailOk || !passOk) return;
-      // Demostración local: se reutiliza el perfil guardado si el correo coincide;
-      // la contraseña nunca se almacena ni se registra.
-      let profile = null;
-      try {
-        const prev = JSON.parse(localStorage.getItem("tottus_user") || "null");
-        if (prev && prev.email && String(prev.email).toLowerCase() === email.toLowerCase()) profile = prev;
-      } catch { profile = null; }
-      if (!profile) {
-        const base = email.split("@")[0].replace(/[._-]+/g, " ").trim() || "Cliente";
-        const name = base.replace(/\b\w/g, (c) => c.toUpperCase());
-        profile = { name, email, dni: "", birth: "", age: null, isAdult: true };
-      }
-      try { localStorage.setItem("tottus_user", JSON.stringify(profile)); } catch { /* noop */ }
+      // No existe backend de correo/contraseña: NO se crea ni se guarda ningún
+      // perfil, correo ni contraseña (nada se envía al servidor). Se entra al
+      // modo demostración, que queda claramente identificado ("Modo
+      // demostración") y no representa una sesión autenticada.
+      $("authEmail").value = "";
       $("authPass").value = "";
-      showWelcome();
-      updateAuthUI();
-      toast("👋 Bienvenido/a, " + String(profile.name).split(" ")[0]);
-      botSay(`👋 <b>¡Hola, ${String(profile.name).split(" ")[0]}!</b> Soy <b>Tobi</b> 🤖. Escanea con 📷 <b>Escanear</b>, paga desde tu celular y valida en caja y salida. ¡Sin colas!`);
+      enterDemo();
     });
   }
 

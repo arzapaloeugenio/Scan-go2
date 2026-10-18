@@ -745,6 +745,19 @@ body.access-mode { padding-bottom: 0 !important; }
 .modal-card h3 { margin: 0; color: var(--green-dark); }
 .modal-card p { margin: 0; font-size: 15px; line-height: 1.5; }
 
+/* Aviso propio de Scan & Go ("Acceso con Google próximamente").
+   Diseño coherente con la app; no imita la interfaz de Google. */
+.google-modal-card { position: relative; text-align: left; }
+.google-modal-card h3 { padding-right: 30px; }
+.google-modal-card .modal-close {
+  position: absolute; top: 8px; right: 8px;
+  background: transparent; border: none; color: var(--text);
+  font-size: 16px; line-height: 1; cursor: pointer;
+  padding: 6px 8px; border-radius: 8px;
+}
+.google-modal-card .modal-close:hover { background: rgba(0, 0, 0, .06); }
+.google-modal-card .modal-close:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
 @media (min-width: 700px) {
   body { padding-bottom: 20px; }
   .bottom-nav { position: sticky; max-width: 640px; margin: 14px auto 0; }
