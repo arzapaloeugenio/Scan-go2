@@ -2,7 +2,7 @@
 
 > Documento de trabajo: segunda iteración del proyecto **Tottus Scan & Go** (Universidad Norbert Wiener – Software 1, Proyecto Integrador).
 > Fecha: septiembre 2026 · Equipo: Arzapalo, Alva, Cabrejos, Condori · Ciclo: IS4M1.
-> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–28 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio, revisión final y visibilidad nav/TOBI solo en dashboard). **Sexta iteración (TOBI conversacional, octubre 2026):** secciones 39–50 (saludo animado y saltito, chat aparte, historial, saludo con nombre, alergias, productos frecuentes, recetas con filtro, descuentos del día, comprensión, alerta en catálogo, lista de compras y sugerencias). **Séptima iteración (backend Node/Express/PostgreSQL, octubre 2026):** secciones 53–54 documentan la API REST (modelos, controladores y rutas sobre las tablas de `backend/database/init.sql`) y la corrección de la ruta `/api/products`; §55–§57 la integración del catálogo y la búsqueda por código del frontend con la API. **Cierre del backend (octubre 2026):** §58–§61 documentan el registro de compras con detalles y transacción (`orden_detalle`, `POST /api/ordenes`), la conexión del pago del frontend (botón *Pagar* + protección anti doble pago), el historial desde PostgreSQL con respaldo local y la auditoría final del backend. **Octava iteración (ingreso por DNI + Google «próximamente», octubre 2026):** §62 documenta el ingreso por DNI contra el backend real, la desactivación segura de Google (modal propio, sin OAuth en el frontend), el modo demostración claramente etiquetado y la validación QA de la Etapa 3. Todo el código se genera solo con **Opencode**.
+> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–28 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio, revisión final y visibilidad nav/TOBI solo en dashboard). **Sexta iteración (TOBI conversacional, octubre 2026):** secciones 39–50 (saludo animado y saltito, chat aparte, historial, saludo con nombre, alergias, productos frecuentes, recetas con filtro, descuentos del día, comprensión, alerta en catálogo, lista de compras y sugerencias). **Séptima iteración (backend Node/Express/PostgreSQL, octubre 2026):** secciones 53–54 documentan la API REST (modelos, controladores y rutas sobre las tablas de `backend/database/init.sql`) y la corrección de la ruta `/api/products`; §55–§57 la integración del catálogo y la búsqueda por código del frontend con la API. **Cierre del backend (octubre 2026):** §58–§61 documentan el registro de compras con detalles y transacción (`orden_detalle`, `POST /api/ordenes`), la conexión del pago del frontend (botón *Pagar* + protección anti doble pago), el historial desde PostgreSQL con respaldo local y la auditoría final del backend. **Octava iteración (ingreso por DNI + Google «próximamente», octubre 2026):** §62 documenta el ingreso por DNI contra el backend real, la desactivación segura de Google (modal propio, sin OAuth en el frontend), el modo demostración claramente etiquetado y la validación QA de la Etapa 3. **Fase 2A (octubre 2026):** §63 documenta la separación estricta entre modo demo y cliente real en catálogo, búsqueda, pagos e historial, eliminando el fallback al cliente 1. Todo el código se genera solo con **Opencode**.
 
 Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 
@@ -1036,6 +1036,8 @@ El botón **Pagar ahora** dejó de simular la compra: ahora la registra en el ba
 
 **Verificación:** `node --check frontend/app.js` OK; compra válida → **201** y el ticket usa el total del servidor; doble clic durante el envío no duplica la compra; backend apagado → aviso y carrito intacto.
 
+> **Nota de vigencia (§63):** el envío fijo de `USUARIO_DEMO_ID` se reemplazó por el ID real de `currentClienteId()`; en demo no se hace `POST` y en real sin sesión el pago se bloquea.
+
 ---
 
 ## 60. 🕘 Historial de compras desde PostgreSQL con respaldo local
@@ -1065,6 +1067,8 @@ El historial pasó a leerse del servidor (compras reales con sus productos) y, s
 **Archivos modificados:** `backend/src/models/carritoModel.js` y `frontend/app.js` (sin commit).
 
 **Verificación:** `node --check` OK en ambos; `GET /api/historial/cliente/1` → **200**, `data` arreglo ordenado de la más reciente a la más antigua, con `items`, cantidades, precios unitarios, subtotales y total correctos; cliente sin compras → **200** con `data: []`; con backend apagado se mantiene el respaldo local.
+
+> **Nota de vigencia (§63):** el historial ya no usa `USUARIO_DEMO_ID` ni el respaldo local en modo real. Demo → `tottus_demo_history`; real sin sesión → sin consulta; real con ID (incluido 1) → `GET /api/historial/cliente/:idReal`, sin mezclar datos locales ante error.
 
 ---
 
@@ -1114,3 +1118,70 @@ Fase de cierre del acceso: el ingreso por DNI queda **activo contra el backend r
 **Verificación (QA real, 2026-10-18):** health `GET /` OK; DNI existente **200** (`Cliente Demo`, dni 99999999), inexistente **404**, formato inválido **400**; con el backend apagado el frontend muestra «No se pudo conectar con el servidor…» y **no** crea sesión; recuperación correcta tras reiniciar el backend; `POST /api/auth/google` sin `credential` → **400** (OAuth real pospuesto por falta de `GOOGLE_CLIENT_ID`); `node --check` OK; cámara/lector verificados manualmente en Vercel.
 
 **Sin efectos secundarios:** no se crearon ni borraron clientes, órdenes ni datos durante la validación.
+
+> **Nota de vigencia (§63):** el fallback al cliente demo en `currentClienteId()` se eliminó. Ahora devuelve el ID real de `tottus_user` (incluido 1) y `null` en demo o sin sesión válida.
+
+---
+
+## 63. 🧭 Fase 2A — Separación estricta entre modo demo y cliente real
+
+Rama de trabajo: **`fix-local-api-orders`** (octubre 2026). Objetivo: que el modo demo nunca consulte ni escriba datos reales, que el modo real sin sesión no invente un cliente y que **el ID 1 de PostgreSQL deje de estar reservado/bloqueado**. Sin cambios en login, registro, Google Auth, diseño, backend ni base de datos.
+
+### 63.1 Cambios en `frontend/app.js`
+
+| Cambio | Detalle |
+|--------|---------|
+| `currentClienteId()` | Devuelve `null` si `demoMode === true`, si no existe `tottus_user`, si el JSON es inválido (`try/catch`) o si `id` no es entero positivo. Devuelve el ID real en cualquier otro caso, **incluido `1`**. Sin fallback al cliente demo. |
+| `USUARIO_DEMO_ID` eliminado | Se retiró la constante `= 1` y la condición `id === USUARIO_DEMO_ID`. La demo se distingue **solo** por `demoMode`, no por el ID del usuario. |
+| `cargarProductosDesdeAPI()` | Demo: usa exclusivamente `PRODUCTOS_LOCALES`, sin `fetch`, y registra `[modo-demo] catálogo local cargado`. Real: consulta la API y registra `[modo-real] catálogo cargado desde la API`. |
+| `sincronizarCatalogoConModo()` + `updateAuthUI()` | Al cambiar demo ↔ real se recarga el catálogo del modo correspondiente (sin tocar formularios ni listeners de acceso). |
+| `enterDemo()` | Fuerza `PRODUCTOS = PRODUCTOS_LOCALES.slice()` y el log de modo demo; no crea ni escribe `tottus_user`, no depende de PostgreSQL. |
+| `buscarProductoPorCodigo()` | Nuevo contrato `{ producto, error }`. Demo: solo catálogo local, sin red. Real: `200` → producto; `404` → “El código EAN … no está registrado”; error de red/CORS → “Error de conexión con el servidor…”, **sin** afirmar que no existe y **sin** activar demo. |
+| `onScannedCode()` | Consume `{ producto, error }` y muestra el mensaje correspondiente por `mostrarEstadoLector()`. |
+| `registrarCompra()` | **Demo:** no ejecuta `fetch` ni `POST /api/ordenes`, guarda la orden simulada en `tottus_demo_history`, vacía el carrito y muestra “Compra de demostración completada. No se registraron datos reales.” **Real sin sesión:** corta antes del `fetch`, conserva el carrito y pide iniciar sesión. **Real con ID:** `POST /api/ordenes` con el ID real; solo limpia el carrito con **HTTP 201**; 400/404/500/red conservan el carrito y no simulan compra. |
+| `payNow()` | Toma un snapshot de ítems antes del pago (para el ticket demo), reutiliza el `ticketId` simulado y muestra el mensaje demo o real según corresponda. |
+| `cargarHistorialRemoto()` | Demo: solo lee `tottus_demo_history`, sin llamar a `/api/historial/cliente/1`. Real sin ID: no consulta backend y pide iniciar sesión. Real con ID: `GET /api/historial/cliente/:idReal`; si falla, deja historial vacío/error **sin** mezclar `tottus_history` ni la demo. |
+| `historialVista()` / `renderHistory()` | Fuente según modo: demo local, real remota, sin sesión → mensaje “Inicia sesión para ver tu historial de compras.” |
+| `getDemoHistory()` / `saveDemoHistoryEntry()` | Lectura/escritura exclusiva de `tottus_demo_history` (máx. 20 entradas). |
+| `validateSalida()` | En demo no escribe en `tottus_history` (la orden simulada ya está en `tottus_demo_history`). |
+
+### 63.2 Cambios en `frontend/sw.js`
+
+| Cambio | Detalle |
+|--------|---------|
+| Caché | `tottus-scan-go-v10` → **`tottus-scan-go-v11`**. El evento `activate` existente elimina los cachés distintos de la versión actual, por lo que el navegador carga el `app.js` nuevo. |
+
+### 63.3 Comportamiento por escenario
+
+| Flujo | Demo (`demoMode=true`) | Real sin sesión | Real con sesión (ID válido, incluso 1) |
+|---|---|---|---|
+| Catálogo | Solo `PRODUCTOS_LOCALES`, sin red | API `/api/products` | API `/api/products` |
+| Escaneo | Solo local | API; 404 = no registrado; red = error de conexión | API con el mismo cliente real |
+| Pago | Simulación local; sin `POST`; carrito vaciado | Bloqueado antes del `fetch`; carrito intacto | `POST /api/ordenes` con ID real; limpia solo con 201 |
+| Historial | `tottus_demo_history` | No consulta; pide iniciar sesión | `GET /api/historial/cliente/:idReal` |
+| `tottus_user` | Nunca se crea | Puede no existir | Fuente del ID real |
+| `tottus_history` | No se escribe | No se escribe | Se conserva para el flujo real |
+
+### 63.4 Verificación
+
+| Prueba | Resultado |
+|--------|-----------|
+| `node --check frontend/app.js` | ✅ OK |
+| `node --check frontend/sw.js` | ✅ OK |
+| `git diff --check` | ✅ sin errores de whitespace |
+| Búsqueda estática: `USUARIO_DEMO_ID` | ✅ 0 coincidencias tras eliminarlo |
+| Búsqueda estática: fallback `1` en órdenes/historial | ✅ ninguno; no existe retorno `1` por defecto |
+| `GET /` | ✅ **200** |
+| `GET /api/products` | ✅ **200** |
+| `GET /api/products/7750123450013` | ✅ **200** |
+| `GET /api/products/0000000000000` | ✅ **404** JSON (`Producto no encontrado`) |
+| `OPTIONS /api/ordenes` (Origin `http://localhost:8000`) | ✅ **204** + `Access-Control-Allow-Origin: http://localhost:8000` |
+| `POST /api/ordenes` durante la validación | ❌ no ejecutado (prueba no destructiva) |
+
+**Prueba manual A (demo):** entrar con “Ver demostración” → consola `[modo-demo] catálogo local cargado` → sin requests a `/api/products`, `/api/ordenes` ni `/api/historial` → pagar → mensaje demo → `tottus_demo_history` con la orden y carrito vacío.
+
+**Prueba manual B (real sin sesión):** cerrar sesión o borrar `tottus_user` → catálogo desde API → **Pagar ahora** → “Inicia sesión para completar la compra.”, sin `POST /api/ordenes` y carrito intacto → historial pide iniciar sesión y no llama a `/api/historial/cliente/1`.
+
+**Archivos modificados:** `frontend/app.js`, `frontend/sw.js` y este documento. Sin cambios en backend, base de datos, login, registro, Google Auth ni estilos. **Sin commit.**
+
+**Confirmación clave:** un cliente real de PostgreSQL con `id = 1` **ya no se bloquea**. Con `demoMode === false`, `currentClienteId()` devuelve `1` y el pago/historial operan con ese ID real; la demo devuelve `null` por la bandera de modo, nunca por comparar el ID.
