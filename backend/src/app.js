@@ -11,6 +11,8 @@ const historialRoutes = require('./routes/historialRoutes');
 const authRoutes = require('./routes/authRoutes');
 const clienteRoutes = require('./routes/clienteRoutes');
 
+const pool = require('../config/db');
+
 const app = express();
 
 // CORS: se permiten SOLO los origenes configurados por variables de entorno.
@@ -61,6 +63,24 @@ app.use('/api/descuentos', descuentoRoutes);
 app.use('/api/historial', historialRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/clientes', clienteRoutes);
+
+// Health check: valida la conexion a la base de datos sin exponer detalles.
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT NOW()');
+    return res.status(200).json({
+      success: true,
+      service: 'scan-go2-backend',
+      database: 'connected',
+    });
+  } catch (err) {
+    return res.status(503).json({
+      success: false,
+      service: 'scan-go2-backend',
+      database: 'disconnected',
+    });
+  }
+});
 
 app.use((req, res) => {
   res.status(404).json({
