@@ -1,5 +1,5 @@
 /* Tottus Scan & Go - SW mínimo offline (demo) */
-const CACHE = "tottus-scan-go-v10";
+const CACHE = "tottus-scan-go-v11";
 const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.json", "./tobi-chat.js", "./tobi-history.js", "./tobi-profile.js", "./tobi-recipes.js", "./tobi-discounts.js", "./tobi-allergens.js"];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));

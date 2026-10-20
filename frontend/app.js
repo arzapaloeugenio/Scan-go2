@@ -84,9 +84,23 @@ function normalizarProductoAPI(item) {
 // Carga el catálogo desde GET /api/products. Ante cualquier fallo conserva el
 // respaldo local y avisa una sola vez. No permite reejecuciones innecesarias.
 let catalogoRemotoIntentado = false;
+// Mantiene el catálogo alineado con el modo activo: demo = solo local, real = API.
+let ultimoModoCatalogo = false;
+function sincronizarCatalogoConModo() {
+  if (demoMode === ultimoModoCatalogo) return;
+  ultimoModoCatalogo = demoMode;
+  catalogoRemotoIntentado = false;
+  cargarProductosDesdeAPI().then(() => renderAll());
+}
 async function cargarProductosDesdeAPI() {
   if (catalogoRemotoIntentado) return;
   catalogoRemotoIntentado = true;
+  // Modo demo: usa exclusivamente el catálogo local, sin llamar a fetch.
+  if (demoMode) {
+    PRODUCTS = PRODUCTOS_LOCALES.slice();
+    console.log("[modo-demo] catálogo local cargado");
+    return;
+  }
   try {
     const response = await fetch(`${API_BASE_URL}/api/products`);
     if (!response.ok) throw new Error("HTTP " + response.status);
@@ -98,39 +112,57 @@ async function cargarProductosDesdeAPI() {
     const remotos = lista.map(normalizarProductoAPI).filter(Boolean);
     if (!remotos.length) throw new Error("catálogo remoto vacío o inválido");
     PRODUCTS = remotos;
-    console.log(`[catalogo] ${remotos.length} productos cargados desde la API`);
+    console.log("[modo-real] catálogo cargado desde la API");
   } catch (e) {
     PRODUCTS = PRODUCTOS_LOCALES.slice();
-    console.warn("[catalogo] API no disponible; usando catálogo local de respaldo");
+    console.warn("[modo-real] API no disponible; catálogo local de respaldo");
   }
 }
 
-// Busca un producto por código de barras: primero en la API y, si la petición
-// falla (backend apagado o error de red), en el catálogo local de respaldo.
-// Devuelve el producto en la estructura interna o null si no existe.
+// Busca un producto por código de barras.
+// - Modo demo: solo PRODUCTOS_LOCALES, sin fetch.
+// - Modo real: GET a la API; devuelve el producto o un mensaje de error claro.
+// Resultado: { producto, error }; error === null cuando la búsqueda fue válida.
 const busquedasProductoEnCurso = new Map();
 async function buscarProductoPorCodigo(codigo) {
   const code = String(codigo == null ? "" : codigo).trim();
-  if (!code) return null;
+  if (!code) return { producto: null, error: "Código de barras vacío." };
+  // Modo demo: catálogo local exclusivamente (nunca fetch).
+  if (demoMode) {
+    const local = PRODUCTOS_LOCALES.find((p) => p.code === code) || null;
+    if (local && !PRODUCTS.some((p) => p.code === local.code)) PRODUCTS.push(local);
+    return { producto: local, error: null };
+  }
   // Evita solicitudes duplicadas provocadas por la misma lectura rápida.
   if (busquedasProductoEnCurso.has(code)) return busquedasProductoEnCurso.get(code);
   const tarea = (async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/products/${encodeURIComponent(code)}`);
-      if (response.status === 404) return null; // Respuesta definitiva: no registrado.
+      if (response.status === 404) {
+        // Respuesta definitiva: el EAN no está registrado en el catálogo.
+        let msg = "";
+        try {
+          const cuerpo = await response.json();
+          if (cuerpo && typeof cuerpo.message === "string") msg = cuerpo.message;
+        } catch { /* cuerpo no JSON */ }
+        return { producto: null, error: msg || `El código EAN ${code} no está registrado.` };
+      }
       if (!response.ok) throw new Error("HTTP " + response.status);
       const payload = await response.json();
       const item = (payload && payload.success !== false) ? (payload.data || payload) : null;
       const prod = normalizarProductoAPI(item);
       if (!prod) throw new Error("respuesta inválida");
-      // Garantiza que addToCart() (sin modificar) encuentre el producto.
+      // Garantiza que addToCart() encuentre el producto.
       if (!PRODUCTS.some((p) => p.code === prod.code)) PRODUCTS.push(prod);
-      return prod;
+      return { producto: prod, error: null };
     } catch (e) {
-      // Backend apagado o petición fallida: usa el respaldo local.
-      return PRODUCTS.find((p) => p.code === code)
-        || PRODUCTOS_LOCALES.find((p) => p.code === code)
-        || null;
+      // Error de red/CORS o respuesta inválida: NO se afirma que el producto
+      // no exista y NO se activa demoMode automáticamente.
+      console.warn("[modo-real] error de conexión al consultar el catálogo:", e);
+      return {
+        producto: null,
+        error: "Error de conexión con el servidor. No se pudo verificar el código.",
+      };
     }
   })();
   busquedasProductoEnCurso.set(code, tarea);
@@ -201,6 +233,20 @@ function clearOrder() {
   try { localStorage.removeItem(ORDER_KEY); } catch { /* noop */ }
 }
 const HISTORY_KEY = "tottus_history";
+const DEMO_HISTORY_KEY = "tottus_demo_history";
+function getDemoHistory() {
+  try {
+    const h = JSON.parse(localStorage.getItem(DEMO_HISTORY_KEY) || "[]");
+    return Array.isArray(h) ? h : [];
+  } catch { return []; }
+}
+function saveDemoHistoryEntry(entry) {
+  try {
+    const h = getDemoHistory();
+    h.unshift(entry);
+    localStorage.setItem(DEMO_HISTORY_KEY, JSON.stringify(h.slice(0, 20)));
+  } catch { /* noop */ }
+}
 function getHistory() {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); }
   catch { return []; }
@@ -213,22 +259,49 @@ function saveHistoryEntry(entry) {
   } catch { /* noop */ }
 }
 // Historial remoto (PostgreSQL): el backend expone el historial por cliente en
-// GET /api/historial/cliente/:idCliente (con sus productos). Se prefiere el
-// servidor; si la API no responde, se conserva el respaldo local (tottus_history).
+// GET /api/historial/cliente/:idCliente (con sus productos).
+// - Demo: solo lee "tottus_demo_history" de localStorage; nunca llama al backend.
+// - Real sin sesión: no consulta ni muestra datos (requiere iniciar sesión).
+// - Real con ID: usa exclusivamente el servidor; si falla, no mezcla datos locales.
 // `historialRemoto === null` = aún no cargado o servidor no disponible.
 let historialRemoto = null;
 let historialCargando = false;
+let historialError = false;
 async function cargarHistorialRemoto() {
+  // Modo demo: historial simulado local, sin ninguna llamada a la API.
+  if (demoMode) {
+    historialRemoto = null;
+    historialError = false;
+    renderHistory();
+    return;
+  }
+  const clienteId = currentClienteId();
+  // Sin sesión real: no se llama al backend ni se muestra el historial demo.
+  if (clienteId === null) {
+    historialRemoto = null;
+    historialError = false;
+    renderHistory();
+    return;
+  }
   if (historialCargando) return;
   historialCargando = true;
   try {
-    const response = await fetch(`${API_BASE_URL}/api/historial/cliente/${currentClienteId()}`);
+    const response = await fetch(`${API_BASE_URL}/api/historial/cliente/${clienteId}`);
     let payload = null;
     try { payload = await response.json(); } catch { payload = null; }
     if (response.ok && payload && payload.success === true && Array.isArray(payload.data)) {
       historialRemoto = payload.data;
+      historialError = false;
+    } else {
+      // Error del servidor: historial vacío, sin mezclar datos locales.
+      historialRemoto = null;
+      historialError = true;
     }
-  } catch { /* sin backend: se mantiene el respaldo local */ }
+  } catch {
+    // Sin backend: historial vacío, sin mezclar datos locales.
+    historialRemoto = null;
+    historialError = true;
+  }
   finally {
     historialCargando = false;
     renderHistory();
@@ -241,8 +314,10 @@ function formatearFechaHistorial(fecha) {
     return d.toLocaleString("es-PE");
   } catch { return String(fecha || ""); }
 }
-// Normaliza ambas fuentes (remota y local) al mismo modelo que pinta la UI.
+// Normaliza ambas fuentes (demo local y remota) al mismo modelo que pinta la UI.
 function historialVista() {
+  if (demoMode) return getDemoHistory();
+  if (currentClienteId() === null) return [];
   if (historialRemoto !== null) {
     return historialRemoto.map((c) => ({
       ticketId: c.compraId != null ? `N.° ${c.compraId}` : "Compra",
@@ -252,7 +327,7 @@ function historialVista() {
       method: c.estado || "",
     }));
   }
-  return getHistory();
+  return [];
 }
 function beep(ok = true) {
   try {
@@ -584,6 +659,7 @@ function showView(name) {
 }
 
 function updateAuthUI() {
+  sincronizarCatalogoConModo();
   const user = getUser();
   const logged = !!user || demoMode;
   // Estado visual único: access (bienvenida/login/registro) vs dashboard.
@@ -612,6 +688,8 @@ function updateAuthUI() {
 function enterDemo() {
   if (demoMode) { showView("home"); return; }
   demoMode = true;
+  PRODUCTS = PRODUCTOS_LOCALES.slice();
+  console.log("[modo-demo] catálogo local cargado");
   updateAuthUI();
   toast("⚡ Modo demo: explora la tienda 🛒");
   botSay(`👋 <b>¡Hola, Cliente!</b> Soy <b>Tobi</b> 🤖. Estás en el modo de prueba de Tottus Scan &amp; Go: agrega productos del catálogo o pulsa 📷 <b>Escanear</b> (hay códigos de prueba). Yo te acompaño en tu compra hasta la salida 🛡️`);
@@ -1061,10 +1139,10 @@ async function onScannedCode(rawCode) {
   // Tiempo real de detección con meta menor de 3 segundos, sin simulación.
   const dt = scanT0 ? ((performance.now() - scanT0) / 1000) : 0;
   const perf = dt ? ` <span class="perf-hint">⏱️ ${dt.toFixed(1)}s (meta &lt;3s ${dt < 3 ? "✅" : "⚠️"})</span>` : "";
-  const prod = await buscarProductoPorCodigo(code);
+  const { producto: prod, error } = await buscarProductoPorCodigo(code);
   if (!prod) {
-    // Código inexistente en backend y en el respaldo local (o HTTP 404).
-    mostrarEstadoLector(SCANNER_UNKNOWN_MSG + " " + String(code).trim(), true);
+    // 404: EAN no registrado. Error de red: no se afirma que no exista.
+    mostrarEstadoLector(error || (SCANNER_UNKNOWN_MSG + " " + String(code).trim()), true);
     beep(false);
     scanT0 = 0;
     return;
@@ -1082,6 +1160,14 @@ async function onScannedCode(rawCode) {
 function renderHistory() {
   const el = $("historyList");
   if (!el) return;
+  if (!demoMode && currentClienteId() === null) {
+    el.innerHTML = `<p class="muted small">Inicia sesión para ver tu historial de compras.</p>`;
+    return;
+  }
+  if (!demoMode && historialError) {
+    el.innerHTML = `<p class="muted small">No se pudo cargar tu historial desde el servidor.</p>`;
+    return;
+  }
   const h = historialVista();
   if (!h.length) {
     el.innerHTML = `<p class="muted small">Sin compras aún. Tu boleta guardada aparecerá aquí.</p>`;
@@ -1427,21 +1513,30 @@ Items: ${q}/${MAX_ITEMS}`;
 // carritoController.registrarCompra). El backend recalcula precios, subtotales
 // y total en PostgreSQL (transacción BEGIN/COMMIT/ROLLBACK); el frontend nunca
 // envía precios ni totales como fuente de verdad.
-// id del cliente demo sembrado en database/init/02-insert-data.sql (dni 99999999).
-const USUARIO_DEMO_ID = 1;
-// Identificador real del cliente identificado (por DNI) y guardado en
-// localStorage['tottus_user']; si no hay uno, se usa el cliente demo.
+// Identificador real del cliente identificado (por DNI) guardado en
+// localStorage['tottus_user']. Devuelve null en demo o sin sesión válida.
+// El modo demo se distingue solo con demoMode, nunca por el ID del cliente.
 function currentClienteId() {
-  const u = getUser();
-  return (u && Number.isInteger(u.id) && u.id > 0) ? u.id : USUARIO_DEMO_ID;
+  if (demoMode) return null;
+  try {
+    const raw = localStorage.getItem("tottus_user");
+    if (!raw) return null;
+    const u = JSON.parse(raw);
+    const id = u && Number(u.id);
+    if (!Number.isInteger(id) || id <= 0) return null;
+    return id;
+  } catch {
+    // JSON inválido o storage bloqueado: sin identidad real.
+    return null;
+  }
 }
 // Protección contra doble pago: bloquea nuevos envíos mientras hay uno en curso.
 let pagoEnProceso = false;
 
 // Transforma el carrito ({ codigo: cantidad }) en los items exactos del backend
 // y registra la compra. Devuelve los `data` confirmados por el servidor
-// (compraId/total/items) o null ante cualquier error; en todos los errores el
-// carrito se conserva intacto y no se registra nada localmente.
+// (compraId/total/items) o null ante cualquier error; en el modo real, ante
+// cualquier error el carrito se conserva intacto y no se registra nada.
 async function registrarCompra(carrito = cart) {
   if (pagoEnProceso) return null;
   const items = [];
@@ -1457,27 +1552,59 @@ async function registrarCompra(carrito = cart) {
     return null;
   }
 
+  // Caso A — demo: compra simulada 100% local, sin fetch ni POST.
+  if (demoMode) {
+    const qty = items.reduce((s, i) => s + i.cantidad, 0);
+    const total = items.reduce((s, i) => {
+      const p = PRODUCTS.find((x) => x.code === i.codigoBarras)
+        || PRODUCTOS_LOCALES.find((x) => x.code === i.codigoBarras);
+      return s + (p ? Number(p.price) * i.cantidad : 0);
+    }, 0);
+    const ticketId = "TSG-" + Date.now().toString(36).toUpperCase();
+    // La orden simulada vive solo en "tottus_demo_history".
+    saveDemoHistoryEntry({
+      ticketId,
+      date: new Date().toLocaleString("es-PE"),
+      total,
+      qty,
+      method: "Demo",
+    });
+    cart = {};
+    saveState();
+    renderAll();
+    toast("Compra de demostración completada. No se registraron datos reales.");
+    return { demo: true, compraId: null, ticketId, total, qty };
+  }
+
+  // Caso B — real sin sesión válida: se detiene antes de cualquier fetch.
+  const clienteId = currentClienteId();
+  if (clienteId === null) {
+    toast("Inicia sesión para completar la compra.");
+    return null; // carrito intacto, sin POST ni simulación demo
+  }
+
   const btn = $("btnPayNow");
   const btnTexto = btn ? btn.textContent : "";
   pagoEnProceso = true;
   if (btn) { btn.disabled = true; btn.textContent = "Procesando..."; }
   try {
+    // Caso C — real con ID entero positivo: cliente real, nunca el demo.
     const response = await fetch(`${API_BASE_URL}/api/ordenes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ usuarioId: currentClienteId(), items }),
+      body: JSON.stringify({ usuarioId: clienteId, items }),
     });
     // Un solo parseo: si el cuerpo no es JSON válido se trata como error.
     let payload = null;
     try { payload = await response.json(); } catch { payload = null; }
-    // Éxito real: HTTP 2xx + success true + identificador de compra presente.
-    if (!response.ok || !payload || payload.success !== true
+    // Éxito real: solo HTTP 201 + success true + identificador de compra.
+    if (response.status !== 201 || !payload || payload.success !== true
         || !payload.data || payload.data.compraId == null) {
       const msg = (payload && typeof payload.message === "string" && payload.message)
         ? payload.message
         : "No se pudo registrar la compra. Inténtalo nuevamente.";
       toast(msg); // mensaje seguro emitido por la API (toast usa textContent)
-      return null;
+      return null; // 400/404/500: carrito intacto, sin compra demo
     }
     return payload.data;
   } catch {
@@ -1505,20 +1632,21 @@ async function payNow() {
     if (!/^\d{3}$/.test(cvv)) { toast("⚠️ CVV 3 dígitos"); return; }
   }
   // 1) Registra la compra en el backend ANTES de tocar el carrito.
-  //    Si falla (red/400/404/500) se conserva tal cual.
+  //    Si falla (red/400/404/500) se conserva tal cual. En demo se simula local.
+  const itemsSnapshot = JSON.parse(JSON.stringify(cart));
   const compra = await registrarCompra(cart);
   if (!compra) return;
-  // 2) El total confiable es el que confirmó el servidor.
+  // 2) El total confiable es el que confirmó el servidor (o el simulado en demo).
   const totalConfirmado = Number(compra.total);
   const total = Number.isFinite(totalConfirmado) ? totalConfirmado : t.total;
   const subtotal = total / (1 + IGV_RATE);
   const paySecs = payT0 ? ((performance.now() - payT0) / 1000) : 0;
-  const ticketId = "TSG-" + Date.now().toString(36).toUpperCase();
+  const ticketId = compra.ticketId || ("TSG-" + Date.now().toString(36).toUpperCase());
   order = {
     ticketId, method,
     compraId: compra.compraId,
     total, subtotal, igv: total - subtotal, saving: t.saving, qty,
-    items: JSON.parse(JSON.stringify(cart)),
+    items: itemsSnapshot,
     status: "PAGADO_PENDIENTE_CAJA",
     caja: null, salida: null, paySecs: Math.round(paySecs),
   };
@@ -1533,7 +1661,11 @@ async function payNow() {
   $("payStep4").hidden = true;
   setCheckoutStep(2);
   payT0 = 0;
-  toast(`Compra registrada correctamente. N.° de compra: ${compra.compraId} · Total: ${money(total)}`);
+  if (compra.demo) {
+    toast("Compra de demostración completada. No se registraron datos reales.");
+  } else {
+    toast(`Compra registrada correctamente. N.° de compra: ${compra.compraId} · Total: ${money(total)}`);
+  }
 }
 
 function issueCajaQR() {
@@ -1591,7 +1723,11 @@ function validateSalida(inputCode) {
   $("finalTicketBody").innerHTML =
     `<pre>TOTTUS SCAN & GO ✅ SALIDA AUTORIZADA\nRUC demo: 20100123456 | ${order.ticketId}\nCliente: ${user.name.replace(/</g, "&lt;")}${dniTxt}\nPagado: ${money(order.total)} (${order.method}) en ${order.paySecs || 0}s\nSubtotal: ${money(order.subtotal)} | IGV: ${money(order.igv)}\nCaja: validada · Seguridad: validada\nItems: ${order.qty}\nPresenta esta pantalla al salir.</pre>`;
   $("payStep4").scrollIntoView({ behavior: "smooth" });
-  saveHistoryEntry({ ticketId: order.ticketId, date: new Date().toLocaleString("es-PE"), total: order.total, qty: order.qty, method: order.method });
+  // Demo: la orden simulada ya está en "tottus_demo_history"; no se escribe
+  // en el historial real ("tottus_history").
+  if (!demoMode) {
+    saveHistoryEntry({ ticketId: order.ticketId, date: new Date().toLocaleString("es-PE"), total: order.total, qty: order.qty, method: order.method });
+  }
   cargarHistorialRemoto();
   clearOrder(); // compra cerrada; QRs quedan invalidados (también en storage)
   confettiBurst();
