@@ -243,25 +243,52 @@ function setFormStatus(el, msg, type) {
 // Estado del pago/retiro
 let order = null; // { ticketId, method, total, items, subtotal, igv, saving, qty, caja:{code,token,exp,used}, salida:{...}, status }
 let qrTimer = null;
-const ORDER_KEY = "tottus_order";
+// La clave antigua "tottus_order" se conserva intacta, pero ya no se usa ni se
+// migra porque no es posible determinar a qué modo o cliente pertenecía.
+const ORDER_KEY_DEMO = "tottus_order_demo";
+const ORDER_KEY_REAL_PREFIX = "tottus_order_real_";
 let scanT0 = 0; // perf RNF02 (<3s por scan)
 let payT0 = 0; // perf objetivo pago (<=60s)
 
+// La orden activa depende exclusivamente del modo y del cliente real actual.
+function claveOrdenActual() {
+  if (demoMode) return ORDER_KEY_DEMO;
+  const clienteId = currentClienteId();
+  return clienteId === null ? null : ORDER_KEY_REAL_PREFIX + clienteId;
+}
 function saveOrder() {
+  const key = claveOrdenActual();
+  if (!key) return;
   try {
-    if (order) localStorage.setItem(ORDER_KEY, JSON.stringify(order));
-    else localStorage.removeItem(ORDER_KEY);
+    if (order) localStorage.setItem(key, JSON.stringify(order));
+    else localStorage.removeItem(key);
   } catch { /* storage lleno/bloqueado */ }
 }
 function loadOrder() {
+  const key = claveOrdenActual();
+  if (!key) { order = null; return; }
   try {
-    const o = JSON.parse(localStorage.getItem(ORDER_KEY) || "null");
+    const o = JSON.parse(localStorage.getItem(key) || "null");
     order = (o && o.ticketId) ? o : null;
   } catch { order = null; }
 }
 function clearOrder() {
+  const key = claveOrdenActual();
   order = null;
-  try { localStorage.removeItem(ORDER_KEY); } catch { /* noop */ }
+  if (!key) return;
+  try { localStorage.removeItem(key); } catch { /* noop */ }
+}
+// Oculta y vacía cualquier boleta/ticket visible de un contexto anterior.
+// Evita que una boleta demo quede a la vista al pasar a modo real (o al revés).
+function limpiarBoletaVisible() {
+  const ticketCard = $("ticketCard");
+  if (ticketCard) ticketCard.hidden = true;
+  const ticketBody = $("ticketBody");
+  if (ticketBody) ticketBody.innerHTML = "";
+  const finalTicket = $("finalTicketBody");
+  if (finalTicket) finalTicket.innerHTML = "";
+  const pasoFinal = $("payStep4");
+  if (pasoFinal) pasoFinal.hidden = true;
 }
 const HISTORY_KEY = "tottus_history";
 const DEMO_HISTORY_KEY = "tottus_demo_history";
@@ -298,28 +325,42 @@ function saveHistoryEntry(entry) {
 let historialRemoto = null;
 let historialCargando = false;
 let historialError = false;
+let historialSolicitud = 0;
+let historialClienteId = null;
+// Invalida respuestas en vuelo y borra cualquier historial de otra sesión.
+function limpiarHistorialRemoto() {
+  historialSolicitud += 1;
+  historialRemoto = null;
+  historialCargando = false;
+  historialError = false;
+  historialClienteId = null;
+  renderHistory();
+}
 async function cargarHistorialRemoto() {
   // Modo demo: historial simulado local, sin ninguna llamada a la API.
   if (demoMode) {
-    historialRemoto = null;
-    historialError = false;
-    renderHistory();
+    limpiarHistorialRemoto();
     return;
   }
   const clienteId = currentClienteId();
   // Sin sesión real: no se llama al backend ni se muestra el historial demo.
   if (clienteId === null) {
-    historialRemoto = null;
-    historialError = false;
-    renderHistory();
+    limpiarHistorialRemoto();
     return;
   }
-  if (historialCargando) return;
+  // Solo se evita duplicar la carga del mismo cliente; un cliente distinto
+  // invalida la solicitud anterior mediante el contador.
+  if (historialCargando && historialClienteId === clienteId) return;
+  const solicitud = ++historialSolicitud;
   historialCargando = true;
+  historialClienteId = clienteId;
+  historialRemoto = null;
+  historialError = false;
   try {
     const response = await fetch(`${API_BASE_URL}/api/historial/cliente/${clienteId}`);
     let payload = null;
     try { payload = await response.json(); } catch { payload = null; }
+    if (solicitud !== historialSolicitud) return;
     if (response.ok && payload && payload.success === true && Array.isArray(payload.data)) {
       historialRemoto = payload.data;
       historialError = false;
@@ -329,13 +370,16 @@ async function cargarHistorialRemoto() {
       historialError = true;
     }
   } catch {
+    if (solicitud !== historialSolicitud) return;
     // Sin backend: historial vacío, sin mezclar datos locales.
     historialRemoto = null;
     historialError = true;
   }
   finally {
-    historialCargando = false;
-    renderHistory();
+    if (solicitud === historialSolicitud) {
+      historialCargando = false;
+      renderHistory();
+    }
   }
 }
 function formatearFechaHistorial(fecha) {
@@ -377,20 +421,63 @@ function beep(ok = true) {
   } catch { /* sin audio */ }
 }
 
+// La clave antigua "tottus_cart" se conserva intacta. No se migra
+// automáticamente porque no puede determinarse si pertenecía a demo o a un
+// cliente real.
+const CART_KEY_DEMO = "tottus_cart_demo";
+const CART_KEY_REAL_PREFIX = "tottus_cart_real_";
+// Carrito activo: demo aislado y real aislado por id de cliente.
+function claveCarritoActual() {
+  if (demoMode) return CART_KEY_DEMO;
+  const clienteId = currentClienteId();
+  return clienteId === null ? null : CART_KEY_REAL_PREFIX + clienteId;
+}
 function loadState() {
+  const key = claveCarritoActual();
+  if (!key) { cart = {}; return; }
   try {
-    cart = JSON.parse(localStorage.getItem("tottus_cart") || "{}");
+    const parsed = JSON.parse(localStorage.getItem(key) || "{}");
+    cart = (parsed && typeof parsed === "object" && !Array.isArray(parsed)) ? parsed : {};
   } catch { cart = {}; }
 }
 function saveState() {
   if (cartTotalQty() > MAX_ITEMS) return false; // bloqueo guardado: intento de artículo 41+
-  localStorage.setItem("tottus_cart", JSON.stringify(cart));
-  return true;
+  const key = claveCarritoActual();
+  if (!key) return false; // sin contexto activo no se escribe un carrito compartido
+  try {
+    localStorage.setItem(key, JSON.stringify(cart));
+    return true;
+  } catch { return false; }
 }
 function getUser() {
   try { return JSON.parse(localStorage.getItem("tottus_user") || "null"); }
   catch { return null; }
 }
+// Identidad visible única. En demo NO consulta tottus_user; en real exige id
+// entero positivo y conserva el resto del perfil público ya persistido.
+function identidadActiva() {
+  if (demoMode) {
+    return {
+      id: null,
+      name: "Cliente demo",
+      email: "",
+      dni: "",
+      birth: "",
+      age: null,
+      isAdult: true,
+      demo: true,
+    };
+  }
+  const u = getUser();
+  if (!u || typeof u !== "object") return null;
+  const id = Number(u.id);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  return Object.assign({}, u, {
+    id,
+    name: String(u.name == null ? "" : u.name).trim() || "Cliente",
+  });
+}
+if (typeof window !== "undefined") window.scanGoIdentidadActiva = identidadActiva;
 function calcAge(birthStr) {
   if (!birthStr) return null;
   const b = new Date(birthStr + "T00:00:00");
@@ -686,25 +773,29 @@ function showView(name) {
     setScannerVisual(false);
     updateScannerAvailability();
   }
-  if ((getUser() || demoMode) && name !== "login") botGuideView(name);
+  if (identidadActiva() && name !== "login") botGuideView(name);
   window.scrollTo({ top: 0 });
 }
 
 function updateAuthUI() {
   sincronizarCatalogoConModo();
-  const user = getUser();
-  const logged = !!user || demoMode;
+  // Prioridad absoluta al modo demo: nunca se lee la identidad real para
+  // pintar cabecera, insignia ni mensajes cuando demoMode está activo.
+  const user = identidadActiva();
+  const logged = !!user;
   // Estado visual único: access (bienvenida/login/registro) vs dashboard.
   document.body.classList.toggle("access-mode", !logged);
   document.body.classList.toggle("dashboard-mode", logged);
   $("appHeader").hidden = !logged;
   $("bottomNav").hidden = !logged;
+  const logoutSpan = document.querySelector('.bottom-nav button[data-nav="logout"] span');
+  if (logoutSpan) logoutSpan.textContent = demoMode ? "Salir de demo" : "Salir";
   const badge = $("demoBadge");
-  if (demoMode && !user) {
-    $("headerUser").textContent = "Hola, Cliente demo";
+  if (demoMode) {
+    $("headerUser").textContent = "Hola, " + user.name;
     if (badge) badge.hidden = false;
     showView("home");
-  } else if (logged) {
+  } else if (user) {
     if (badge) badge.hidden = true;
     const tag = user.isAdult === false ? " (menor 🔞)" : "";
     $("headerUser").textContent = "Hola, " + user.name.split(" ")[0] + tag;
@@ -719,10 +810,19 @@ function updateAuthUI() {
 // Reutiliza updateAuthUI/showView (la misma vía que abre la tienda al autenticarse).
 function enterDemo() {
   if (demoMode) { showView("home"); return; }
+  // Carrito y orden ya se guardan en cada cambio, en la clave del contexto
+  // activo. Al entrar a demo solo se cargan las claves exclusivas de demo.
   demoMode = true;
   PRODUCTS = PRODUCTOS_LOCALES.slice();
   console.log("[modo-demo] catálogo local cargado");
+  // Cambia a los estados exclusivos de demo sin tocar tottus_user ni las
+  // claves reales, que permanecen intactas.
+  loadState();
+  loadOrder();
+  limpiarHistorialRemoto();
+  limpiarBoletaVisible();
   updateAuthUI();
+  renderAll();
   toast("⚡ Modo demo: explora la tienda 🛒");
   botSay(`👋 <b>¡Hola, Cliente!</b> Soy <b>Tobi</b> 🤖. Estás en el modo de prueba de Tottus Scan &amp; Go: agrega productos del catálogo o pulsa 📷 <b>Escanear</b> (hay códigos de prueba). Yo te acompaño en tu compra hasta la salida 🛡️`);
 }
@@ -1325,9 +1425,8 @@ function tobiNudgePrimer() {
 }
 
 function firstName() {
-  if (demoMode) return "Cliente";
-  const u = getUser();
-  return u ? u.name.split(" ")[0] : "amigo/a";
+  const ident = identidadActiva();
+  return ident ? ident.name.split(" ")[0] : "amigo/a";
 }
 
 // Mensajes contextuales por vista (guía paso a paso)
@@ -1506,7 +1605,8 @@ function restoreOrderUI() {
 function buildPreTicket() {
   const qty = cartTotalQty();
   const t = calcTotals();
-  const user = getUser() || { name: "Cliente", email: "" };
+  // Identidad activa: demo = Cliente demo sin datos reales; real = perfil válido.
+  const user = identidadActiva() || { name: "Cliente", email: "" };
   const lines = Object.entries(cart).map(([code, q]) => {
     const p = PRODUCTS.find(x => x.code === code);
     return `${q}x ${p.name}\n   ${money(p.price)} c/u → ${money(p.price * q)}`;
@@ -1522,8 +1622,9 @@ function checkout() {
   const hint = $("payTimerHint");
   if (hint) hint.innerHTML = `⏱️ Cronómetro de pago iniciado (meta ≤60s)`;
   const { qty: q, t, user, lines } = buildPreTicket();
-  const ticket = `TOTTUS SCAN & GO - BOLETA DEMO (SUNAT)
-RUC demo: 20100123456 | Ticket pendiente de pago
+  const esDemo = demoMode;
+  const ticket = `TOTTUS SCAN & GO - ${esDemo ? "BOLETA DEMO (SUNAT)" : "BOLETA (SUNAT)"}
+${esDemo ? "RUC demo: 20100123456" : "RUC 20100123456"} | Ticket pendiente de pago
 Cliente: ${user.name} | DNI: ${user.dni || "-"}
 Fecha: ${new Date().toLocaleString("es-PE")}
 --------------------------
@@ -1682,8 +1783,8 @@ async function payNow() {
     status: "PAGADO_PENDIENTE_CAJA",
     caja: null, salida: null, paySecs: Math.round(paySecs),
   };
-  // 3) Solo con la compra confirmada se limpia el carrito (misma clave de
-  //    localStorage que ya usa saveState → "tottus_cart").
+  // 3) Solo con la compra confirmada se limpia el carrito en la clave del
+  //    contexto activo (demo o cliente real), mediante saveState().
   cart = {}; saveState(); renderAll();
   issueCajaQR();
   saveOrder();
@@ -1747,13 +1848,18 @@ function validateSalida(inputCode) {
   order.salida.used = true;
   order.status = "AUTORIZADO";
   stopQrTimer();
-  const user = getUser() || { name: "Cliente" };
-  const dniTxt = user.dni ? ` | DNI: ${String(user.dni).replace(/</g, "&lt;")}` : "";
+  // Identidad activa: en demo nunca se consulta ni se pinta el perfil real.
+  const user = identidadActiva() || { name: "Cliente" };
+  const dniTxt = !demoMode && user.dni ? ` | DNI: ${String(user.dni).replace(/</g, "&lt;")}` : "";
+  const rucTxt = demoMode ? "RUC demo: 20100123456" : "RUC 20100123456";
+  const tituloSalida = demoMode
+    ? "TOTTUS SCAN & GO ✅ SALIDA AUTORIZADA (DEMO)"
+    : "TOTTUS SCAN & GO ✅ SALIDA AUTORIZADA";
   $("payStep3").hidden = true;
   $("payStep4").hidden = false;
   setCheckoutStep(4);
   $("finalTicketBody").innerHTML =
-    `<pre>TOTTUS SCAN & GO ✅ SALIDA AUTORIZADA\nRUC demo: 20100123456 | ${order.ticketId}\nCliente: ${user.name.replace(/</g, "&lt;")}${dniTxt}\nPagado: ${money(order.total)} (${order.method}) en ${order.paySecs || 0}s\nSubtotal: ${money(order.subtotal)} | IGV: ${money(order.igv)}\nCaja: validada · Seguridad: validada\nItems: ${order.qty}\nPresenta esta pantalla al salir.</pre>`;
+    `<pre>${tituloSalida}\n${rucTxt} | ${order.ticketId}\nCliente: ${user.name.replace(/</g, "&lt;")}${dniTxt}\nPagado: ${money(order.total)} (${order.method}) en ${order.paySecs || 0}s\nSubtotal: ${money(order.subtotal)} | IGV: ${money(order.igv)}\nCaja: validada · Seguridad: validada\nItems: ${order.qty}\nPresenta esta pantalla al salir.</pre>`;
   $("payStep4").scrollIntoView({ behavior: "smooth" });
   // Demo: la orden simulada ya está en "tottus_demo_history"; no se escribe
   // en el historial real ("tottus_history").
@@ -1789,7 +1895,7 @@ async function init() {
       updateScannerAvailability();
     });
   }
-  if (order && getUser()) {
+  if (order && !demoMode && identidadActiva()) {
     restoreOrderUI();
     toast("🔄 Retomaste tu pago pendiente");
   }
@@ -1855,7 +1961,12 @@ async function init() {
         clearRegisterErrors();
         const firstName = String(profile.name).split(" ")[0];
         setFormStatus(okBox, "Cuenta creada correctamente. ¡Bienvenido/a!", "success");
+        loadState();
+        loadOrder();
+        limpiarHistorialRemoto();
+        limpiarBoletaVisible();
         updateAuthUI();
+        renderAll();
         cargarHistorialRemoto();
         toast(`✅ Cuenta creada. ¡Bienvenido/a, ${firstName}!`);
       } catch (error) {
@@ -2108,7 +2219,12 @@ async function init() {
         $("authEmail").value = "";
         $("authPass").value = "";
         setFormStatus(statusBox, "");
+        loadState();
+        loadOrder();
+        limpiarHistorialRemoto();
+        limpiarBoletaVisible();
         updateAuthUI();
+        renderAll();
         cargarHistorialRemoto();
         toast(`👋 Bienvenido/a, ${String(profile.name).split(" ")[0]}`);
       } catch (error) {
@@ -2151,14 +2267,35 @@ async function init() {
   document.querySelectorAll(".bottom-nav button").forEach(b => {
     b.addEventListener("click", () => {
       if (b.dataset.nav === "logout") {
-        localStorage.removeItem("tottus_user");
-        demoMode = false;
+        // Distingue salir de demo de cerrar sesión real:
+        // - demo: NO elimina tottus_user; si hay sesión real pausada, vuelve a ella.
+        // - real: elimina tottus_user y vuelve al acceso.
+        const saliendoDeDemo = demoMode;
+        saveState();
+        saveOrder();
+        if (saliendoDeDemo) {
+          demoMode = false;
+        } else {
+          localStorage.removeItem("tottus_user");
+        }
         stopCamera();
         stopQrTimer();
         botClose();
+        loadState();
+        loadOrder();
+        limpiarHistorialRemoto();
+        limpiarBoletaVisible();
         if (window._scanGoShowWelcome) window._scanGoShowWelcome();
         updateAuthUI();
-        toast("Sesión cerrada");
+        renderAll();
+        cargarHistorialRemoto();
+        if (saliendoDeDemo) {
+          toast(identidadActiva()
+            ? "Saliste del modo demo. Tu sesión real sigue activa."
+            : "Saliste del modo demo");
+        } else {
+          toast("Sesión cerrada");
+        }
       } else if (b.dataset.nav === "checkout") openCheckout();
       else showView(b.dataset.nav);
     });

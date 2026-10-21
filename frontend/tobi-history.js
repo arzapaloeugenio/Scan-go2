@@ -26,19 +26,19 @@ function tobiChatStoreWarn() {
   } catch { /* noop */ }
 }
 
-/* DÓNDE CONECTAR EL NOMBRE REAL: hoy se lee el perfil que la propia app guarda
- * en localStorage "tottus_user" (el mismo que pinta "Hola, ..." en el encabezado).
- * En modo demo no hay perfil y se devuelve "Cliente". Cuando exista sesión real
- * con backend, cambia SOLO esta función para leer el nombre de la sesión.
- * Ninguna otra parte del código escribe el nombre a mano: todas la llaman a ella. */
+/* NOMBRE VISIBLE: se obtiene de la identidad activa de la aplicación.
+ * En demo esa función devuelve "Cliente demo" sin consultar tottus_user;
+ * en modo real devuelve el nombre del perfil autenticado. No se lee
+ * localStorage directamente aquí para no filtrar datos reales en demo. */
 function getUserName() {
   try {
-    const raw = localStorage.getItem("tottus_user");
-    const u = raw ? JSON.parse(raw) : null;
-    const first = u && u.name ? String(u.name).trim().split(/\s+/)[0] : "";
-    if (first) return first;
-  } catch { /* bloqueado o corrupto: cae al valor demo */ }
-  return "Cliente"; // valor demo: aún no hay sesión real
+    if (typeof window !== "undefined" && typeof window.scanGoIdentidadActiva === "function") {
+      const u = window.scanGoIdentidadActiva();
+      const first = u && u.name ? String(u.name).trim().split(/\s+/)[0] : "";
+      if (first) return first;
+    }
+  } catch { /* sin identidad disponible: valor demo */ }
+  return "Cliente";
 }
 
 // ---------- Guardado: una conversación = {id, title, createdAt, updatedAt, messages:[{who,text,ts}]} ----------
