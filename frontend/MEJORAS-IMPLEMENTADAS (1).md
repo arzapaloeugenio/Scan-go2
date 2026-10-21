@@ -2,7 +2,7 @@
 
 > Documento de trabajo: segunda iteración del proyecto **Tottus Scan & Go** (Universidad Norbert Wiener – Software 1, Proyecto Integrador).
 > Fecha: septiembre 2026 · Equipo: Arzapalo, Alva, Cabrejos, Condori · Ciclo: IS4M1.
-> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–28 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio, revisión final y visibilidad nav/TOBI solo en dashboard). **Sexta iteración (TOBI conversacional, octubre 2026):** secciones 39–50 (saludo animado y saltito, chat aparte, historial, saludo con nombre, alergias, productos frecuentes, recetas con filtro, descuentos del día, comprensión, alerta en catálogo, lista de compras y sugerencias). **Séptima iteración (backend Node/Express/PostgreSQL, octubre 2026):** secciones 53–54 documentan la API REST (modelos, controladores y rutas sobre las tablas de `backend/database/init.sql`) y la corrección de la ruta `/api/products`; §55–§57 la integración del catálogo y la búsqueda por código del frontend con la API. **Cierre del backend (octubre 2026):** §58–§61 documentan el registro de compras con detalles y transacción (`orden_detalle`, `POST /api/ordenes`), la conexión del pago del frontend (botón *Pagar* + protección anti doble pago), el historial desde PostgreSQL con respaldo local y la auditoría final del backend. **Octava iteración (ingreso por DNI + Google «próximamente», octubre 2026):** §62 documenta el ingreso por DNI contra el backend real, la desactivación segura de Google (modal propio, sin OAuth en el frontend), el modo demostración claramente etiquetado y la validación QA de la Etapa 3 (el login por DNI fue retirado en la Fase 5, §64). **Fase 2A (octubre 2026):** §63 documenta la separación estricta entre modo demo y cliente real en catálogo, búsqueda, pagos e historial, eliminando el fallback al cliente 1. **Fase 5 (octubre 2026):** §64 documenta el registro e inicio de sesión reales con correo y contraseña, bcrypt, la migración `password_hash`, la sesión local mínima y el retiro del login por DNI de la interfaz. Todo el código se genera solo con **Opencode**.
+> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–28 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio, revisión final y visibilidad nav/TOBI solo en dashboard). **Sexta iteración (TOBI conversacional, octubre 2026):** secciones 39–50 (saludo animado y saltito, chat aparte, historial, saludo con nombre, alergias, productos frecuentes, recetas con filtro, descuentos del día, comprensión, alerta en catálogo, lista de compras y sugerencias). **Séptima iteración (backend Node/Express/PostgreSQL, octubre 2026):** secciones 53–54 documentan la API REST (modelos, controladores y rutas sobre las tablas de `backend/database/init.sql`) y la corrección de la ruta `/api/products`; §55–§57 la integración del catálogo y la búsqueda por código del frontend con la API. **Cierre del backend (octubre 2026):** §58–§61 documentan el registro de compras con detalles y transacción (`orden_detalle`, `POST /api/ordenes`), la conexión del pago del frontend (botón *Pagar* + protección anti doble pago), el historial desde PostgreSQL con respaldo local y la auditoría final del backend. **Octava iteración (ingreso por DNI + Google «próximamente», octubre 2026):** §62 documenta el ingreso por DNI contra el backend real, la desactivación segura de Google (modal propio, sin OAuth en el frontend), el modo demostración claramente etiquetado y la validación QA de la Etapa 3 (el login por DNI fue retirado en la Fase 5, §64). **Fase 2A (octubre 2026):** §63 documenta la separación estricta entre modo demo y cliente real en catálogo, búsqueda, pagos e historial, eliminando el fallback al cliente 1. **Fase 5 (octubre 2026):** §64 documenta el registro e inicio de sesión reales con correo y contraseña, bcrypt, la migración `password_hash`, la sesión local mínima y el retiro del login por DNI de la interfaz. Todo el código se genera solo con **Opencode**. **Diagnóstico Fase 5 (octubre 2026):** §65 documenta la verificación estática de registro/login, la consulta agregada segura para Neon y el estado de Git, sin cambios de código ni de datos.
 
 Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 
@@ -1238,6 +1238,7 @@ ADD COLUMN IF NOT EXISTS password_hash TEXT;
 | Retiro del login por DNI | Se eliminaron `#dniLoginForm`, `#dniLogin`, `#dniLoginError`, `#btnDniLogin`, el separador `o`, `setDniLoginError()`, `ingresarConDni()` y su listener. El DNI sigue siendo obligatorio en “Crear cuenta” y `#loginDNI` conserva sus validaciones. |
 | Demo separada | `#btnDemo` es la **única** vía de `enterDemo()`. Login, registro y cualquier error (400/401/409/500/red) no activan la demo ni crean una sesión falsa. |
 | Interfaz | Nuevos estados `#authStatus` y `#registerError` con `aria-live`; estilos mínimos `.form-status` (error/éxito). Se reemplazó “Acceso de demostración” por “Inicia sesión con tu correo y contraseña”. |
+| Caché PWA | `frontend/sw.js`: `tottus-scan-go-v11` → **`tottus-scan-go-v12`**, para que el navegador descarte el `app.js` anterior y cargue el registro/login reales (el evento `activate` ya elimina cachés distintos de la versión actual). |
 | Textos alineados | El modal de Google y la respuesta de TOBI invitan a iniciar sesión con correo/contraseña o a usar “Ver demostración”; ya no ofrecen ingreso por DNI. |
 
 ### 64.4 Archivos de la fase
@@ -1246,7 +1247,7 @@ ADD COLUMN IF NOT EXISTS password_hash TEXT;
 - `backend/src/models/clienteModel.js`
 - `backend/src/controllers/clienteController.js`
 - `backend/src/routes/clienteRoutes.js`
-- `frontend/app.js`, `frontend/index.html`, `frontend/styles.css`, `frontend/tobi-chat.js` (texto de ayuda)
+- `frontend/app.js`, `frontend/index.html`, `frontend/styles.css`, `frontend/sw.js` (caché v12) y `frontend/tobi-chat.js` (texto de ayuda)
 - `database/migrations/002-add-password-hash-clientes.sql` (nuevo)
 - `frontend/DOCUMENTACION-TECNICA (1).md` y este documento
 
@@ -1255,6 +1256,102 @@ ADD COLUMN IF NOT EXISTS password_hash TEXT;
 - `node --check` OK en modelo, controlador, rutas y `frontend/app.js`; `git diff --check` sin errores.
 - Sin `password`, `passwordConfirm` ni `password_hash` en `localStorage`/`sessionStorage` ni en logs.
 - No se ejecutaron POST reales, no se creó ningún cliente y no se ejecutó SQL durante la implementación/revisión.
-- **Pendiente:** prueba manual de registro y login (éxito, 400, 401, 409 y backend caído), en local o producción.
+- **Pendiente:** prueba manual de registro y login (éxito, 400, 401, 409 y backend caído), en local o producción. El diagnóstico de §65 verificó el contrato de forma estática y dejó preparada la consulta agregada para explicar un 401 persistente.
 - Recuperación de contraseña y sesión persistente con token quedan como trabajo futuro.
-- Al cierre de esta documentación, los cambios están **sin commit ni push**.
+- **Estado actual (2026-10-21):** los cambios de la fase están commiteados en **`3d597c9`** (`feat(auth): agregar registro y login de clientes`) y `main` está sincronizada con `origin/main`. No se hizo ningún commit ni push adicional durante el diagnóstico.
+
+### 64.6 Cambios no documentados detectados al revisar la fase
+
+| Cambio real | Estado en la documentación |
+|---|---|
+| `frontend/sw.js`: caché `tottus-scan-go-v11` → **`tottus-scan-go-v12`** | No figuraba en §64.3 ni en §64.4; añadido en esta revisión. |
+| Cierre de §64 afirmaba “sin commit ni push” | Desactualizado: el trabajo ya está en `3d597c9` y sincronizado con `origin/main`; corregido en §64.5. |
+| `frontend/sw.js` dentro de los archivos de la fase | Faltaba en la lista de §64.4; añadido. |
+
+No se detectaron otros cambios de código de la Fase 5 fuera de la documentación: el resto del diff de `3d597c9` (controlador, modelo, rutas, migración, `app.js`, `index.html`, `styles.css` y `tobi-chat.js`) ya estaba descrito en §64.
+
+---
+
+## 65. 🔎 Fase 5 — Diagnóstico de registro/login (solo lectura)
+
+**Rama:** `main` · **Fecha:** 2026-10-21 · **Alcance:** verificar el flujo real de `POST /api/clientes/registro` y `POST /api/clientes/login` **sin modificar código, sin ejecutar SQL, sin crear ni eliminar clientes, sin cambiar contraseñas y sin hacer peticiones POST**.
+
+### 65.1 Estado de Git
+
+| Comprobación | Resultado |
+|---|---|
+| `git status --short` | Al inicio del diagnóstico, sin salida: árbol de trabajo limpio. |
+| `git branch --show-current` | `main` |
+| `git diff --check` | Al inicio del diagnóstico, sin salida: sin errores de espacios. |
+| HEAD | `3d597c9` — `feat(auth): agregar registro y login de clientes` (2026-10-21). |
+| Remoto | `main...origin/main` sin *ahead/behind*: local y remoto sincronizados. |
+
+### 65.2 Contrato verificado (revisión estática)
+
+| Punto | Resultado |
+|---|---|
+| Campos del registro | `nombre`, `dni`, `correo`, `password`, `passwordConfirm` (opcional), `fechaNacimiento`. |
+| Campos del login | `correo`, `password`. |
+| Normalización | `correo` con `trim().toLowerCase()` en registro y login (backend y ambos formularios del frontend). La contraseña **no** se recorta en ninguno de los dos flujos, por lo que se compara exactamente lo enviado. |
+| Generación del hash | `registrar()` ejecuta `bcrypt.hash(password, 10)` (`BCRYPT_ROUNDS = 10`). |
+| Persistencia | `crearConPassword()` inserta el resultado en la columna `password_hash` (`$7` del `INSERT`). |
+| Búsqueda del login | `buscarPorCorreoConPassword()` consulta `WHERE correo = $1` y recupera `password_hash`; el modelo lo expone como `passwordHash`. |
+| Comparación | `iniciarSesion()` ejecuta `bcrypt.compare(password, cliente.passwordHash)`. |
+| Respuesta 401 | Se devuelve el mismo mensaje genérico si la cuenta no existe, si `password_hash` es nulo/vacío o si la comparación falla. |
+| Coincidencia de nombres | `password` (HTTP/controlador) → `passwordHash` (memoria) → `password_hash` (columna), sin cruces. `correo` es la columna canónica; `email` solo pertenece al flujo de Google. |
+| Rutas y arranque | `backend/src/app.js` monta `/api/clientes`; `clienteRoutes.js` define `/registro` y `/login`; `package.json` inicia con `node src/app.js`. |
+
+**Conclusión estática:** no hay incompatibilidad de nombres ni de contrato entre registro y login. El **409** al repetir el registro es el comportamiento esperado (correo ya existente). Un **401** solo puede deberse a: correo distinto/inexistente, `password_hash` nulo o contraseña distinta de la registrada.
+
+### 65.3 Consulta agregada segura para Neon
+
+Preparada para ejecución **manual** en el SQL Editor de Neon. Devuelve únicamente conteos; no selecciona correos, DNI, nombres ni hashes:
+
+```sql
+SELECT
+    COUNT(*) AS total_clientes,
+    COUNT(password_hash) AS clientes_con_hash,
+    COUNT(*) FILTER (WHERE password_hash IS NULL) AS clientes_sin_hash,
+    COUNT(*) FILTER (
+        WHERE password_hash LIKE '$2a$%'
+           OR password_hash LIKE '$2b$%'
+           OR password_hash LIKE '$2y$%'
+    ) AS hashes_con_formato_bcrypt
+FROM public.cliente;
+```
+
+Interpretación:
+
+- `clientes_con_hash = 0` → las cuentas existentes no tienen contraseña guardada (posible alta por DNI/Google o anterior a la migración 002).
+- `clientes_con_hash > hashes_con_formato_bcrypt` → hay hashes nulos, truncados o con formato no bcrypt.
+- `clientes_con_hash = hashes_con_formato_bcrypt > 0` → el registro guardó hashes válidos; el 401 apunta a un correo o contraseña distintos.
+- `total_clientes = 0` → la fila que responde 409 no está en esa base (entorno distinto).
+
+**Esta consulta no se ejecutó durante el diagnóstico.**
+
+### 65.4 Comprobaciones en Render (sin ejecutar POST)
+
+1. **Events:** el último despliegue debe corresponder al commit `3d597c9`.
+2. **Build logs:** confirmar la instalación de `bcryptjs ^3.0.3` sin `npm ERR!` (dependencia declarada en `backend/package.json` y en `package-lock.json`; el *Root Directory* debe ser `backend`).
+3. **Runtime logs:** sin `MODULE_NOT_FOUND` ni `Cannot find module 'bcryptjs'`; debe aparecer `[server] Servidor activo en puerto ...`.
+4. **Rutas del despliegue nuevo:** los POST recientes del usuario deben verse en los logs con sus 401/409; `GET /` debe devolver el mensaje de backend activo y `GET /api/health` debe indicar `"database":"connected"`.
+5. **Descarte de versión antigua:** el commit anterior (`d6804f8`) no definía `/registro` ni `/login`; un despliegue realmente antiguo habría respondido **404**, no 409/401. Por tanto, esos códigos confirman que las rutas nuevas están activas.
+
+No se consultó ni mostró `DATABASE_URL` ni ninguna variable secreta.
+
+### 65.5 Resultado y causa probable
+
+- El **401 inicial** coincide con el uso de correos distintos entre registro y login (hecho observado en las capturas).
+- El **409** al reintentar confirma que la cuenta con ese correo ya existe.
+- Si el 401 persiste usando exactamente el mismo correo, la causa más probable es un `password_hash` nulo (cuenta creada por un flujo anterior); la consulta de §65.3 lo confirma o descarta.
+- Sin el resultado de esa consulta no es posible distinguir entre cuenta sin hash, hash inválido y contraseña distinta. **Causa probable: no determinable todavía** (pendiente de la consulta agregada y del reintento con el mismo correo).
+
+### 65.6 Confirmación de alcance
+
+- No se modificó código de la aplicación, la base de datos ni la configuración.
+- No se ejecutó SQL, no se creó ni eliminó ningún cliente y no se cambió ninguna contraseña.
+- No se mostraron correos, DNI, contraseñas ni hashes.
+- No se hicieron peticiones POST.
+- No se hizo commit ni push.
+- No se implementó recuperación de contraseña ni se inició la Fase 6.
+- La única modificación de esta revisión es **este documento** (§64.3, §64.4, §64.5, §64.6 y §65), a pedido explícito.
