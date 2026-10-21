@@ -264,6 +264,11 @@ body.access-mode { padding-bottom: 0 !important; }
 .auth-card input[aria-invalid="true"], .login-card input[aria-invalid="true"] { border-color: #b71c1c; }
 .field-error { margin: 0; font-size: 12px; font-weight: 700; color: #b71c1c; min-height: 0; }
 .field-error[hidden] { display: none; }
+/* Estado breve de login/registro real (carga, error o éxito). */
+.form-status { margin: 0; font-size: 13px; font-weight: 700; color: var(--green-deep); }
+.form-status[hidden] { display: none; }
+.form-status.is-error { color: #b71c1c; }
+.form-status.is-success { color: var(--green-dark); background: var(--green-soft); border-radius: 10px; padding: 10px 12px; }
 .login-card .field-error { margin: 0; }
 .auth-links { display: flex; justify-content: flex-end; }
 .link-btn { background: none; border: none; padding: 8px 0; min-height: 48px; color: var(--green-deep); font-size: 13px; font-weight: 700; text-decoration: underline; cursor: pointer; }
@@ -275,8 +280,6 @@ body.access-mode { padding-bottom: 0 !important; }
 }
 .login-card .form-success { margin: 0; font-size: 13px; font-weight: 700; color: var(--green-dark); background: var(--green-soft); border-radius: 10px; padding: 10px 12px; }
 .login-card .form-success[hidden] { display: none; }
-.demo-divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
-.demo-divider::before, .demo-divider::after { content: ""; flex: 1; height: 2px; background: var(--border); border-radius: 2px; }
 .btn-demo {
   border: 1px dashed var(--green); background: #fff; color: var(--green-dark);
   border-radius: 12px; padding: 14px; font-weight: 900; font-size: 16px; cursor: pointer;

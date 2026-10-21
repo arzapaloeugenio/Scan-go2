@@ -229,6 +229,51 @@ async function autenticarConGoogle({ googleId, email, nombre, fotoUrl }) {
   }
 }
 
+// Busca un cliente por el correo canonico (`correo`), ya normalizado por el
+// controlador. Proyeccion publica: no incluye password_hash.
+async function buscarPorCorreo(correo) {
+  const { rows } = await pool.query(
+    `SELECT ${COLUMNAS} FROM cliente WHERE correo = $1`,
+    [correo]
+  );
+  return normalizar(rows[0]);
+}
+
+// Uso interno exclusivo del login: incluye password_hash para que el
+// controlador pueda comparar la contrasena. Nunca debe enviarse en una
+// respuesta HTTP; el controlador arma la proyeccion publica por separado.
+async function buscarPorCorreoConPassword(correo) {
+  const { rows } = await pool.query(
+    `SELECT ${COLUMNAS}, password_hash FROM cliente WHERE correo = $1`,
+    [correo]
+  );
+  if (!rows[0]) {
+    return null;
+  }
+  return { ...normalizar(rows[0]), passwordHash: rows[0].password_hash };
+}
+
+// Crea un cliente con contrasena. Solo guarda el hash (nunca la contrasena
+// original) y devuelve la proyeccion segura sin password_hash.
+async function crearConPassword({
+  dni,
+  nombre,
+  correo,
+  fechaNacimiento = null,
+  edad = null,
+  esAdulto = false,
+  passwordHash,
+}) {
+  const { rows } = await pool.query(
+    `INSERT INTO cliente
+       (dni, nombre, correo, fecha_nacimiento, edad, es_adulto, password_hash)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING ${COLUMNAS}`,
+    [dni, nombre, correo, fechaNacimiento, edad, esAdulto, passwordHash]
+  );
+  return normalizar(rows[0]);
+}
+
 module.exports = {
   ErrorAutenticacion,
   aPublico,
@@ -239,4 +284,7 @@ module.exports = {
   buscarPorGoogleId,
   buscarPorEmail,
   autenticarConGoogle,
+  buscarPorCorreo,
+  buscarPorCorreoConPassword,
+  crearConPassword,
 };

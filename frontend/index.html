@@ -55,17 +55,8 @@
       </div>
       <div id="loginCard" class="card auth-card" hidden aria-hidden="true">
         <h2>Iniciar sesión</h2>
-        <p class="muted small">Ingresa con tu DNI para continuar con Scan &amp; Go</p>
-        <form id="dniLoginForm" novalidate>
-          <label for="dniLogin">
-            DNI (8 dígitos)
-            <input type="text" id="dniLogin" placeholder="Ej: 12345678" inputmode="numeric" maxlength="8" pattern="\d{8}" autocomplete="off" />
-          </label>
-          <p class="field-error" id="dniLoginError" hidden aria-live="polite"></p>
-          <button type="submit" class="btn-primary" id="btnDniLogin">Ingresar con DNI</button>
-        </form>
-        <p class="demo-divider">o</p>
-        <p class="muted small">Acceso de demostración (no crea cuenta ni guarda tus datos)</p>
+        <p class="muted small">Ingresa con tu cuenta para continuar con Scan &amp; Go</p>
+        <p class="muted small">Inicia sesión con tu correo y contraseña</p>
         <form id="emailLoginForm" novalidate>
           <label for="authEmail">
             Correo electrónico
@@ -83,6 +74,7 @@
           <div class="auth-links">
             <button type="button" class="link-btn" id="btnForgotPass">¿Olvidaste tu contraseña?</button>
           </div>
+          <p class="form-status" id="authStatus" hidden aria-live="polite"></p>
           <button type="submit" class="btn-primary">Ingresar</button>
           <button type="button" class="btn-ghost" id="btnBackToWelcome">Volver</button>
           <p class="muted small auth-switch">¿No tienes una cuenta? <button type="button" class="link-btn" id="btnGoRegisterFromLogin">Crear cuenta</button></p>
@@ -128,6 +120,7 @@
         </label>
         <p class="field-error" id="loginBirthError" hidden aria-live="polite"></p>
         <p class="muted small">🔞 RN02: licores solo +18 años. Se valida con tu fecha de nacimiento.</p>
+        <p class="form-status" id="registerError" hidden aria-live="polite"></p>
         <p class="form-success" id="registerSuccess" hidden aria-live="polite"></p>
         <button type="submit" class="btn-primary">Crear cuenta</button>
         <button type="button" class="btn-ghost" id="btnBackToWelcomeReg">Volver</button>
@@ -451,7 +444,7 @@
     <div class="modal-card google-modal-card" role="dialog" aria-modal="true" aria-labelledby="googleModalTitle" aria-describedby="googleModalDesc">
       <button type="button" class="modal-close" id="btnCloseGoogleModal" aria-label="Cerrar aviso de Google">✕</button>
       <h3 id="googleModalTitle">Acceso con Google próximamente</h3>
-      <p id="googleModalDesc">El backend ya está preparado para validar cuentas de Google. Esta opción se habilitará cuando se configuren las credenciales oficiales. Por ahora, continúa con tu DNI.</p>
+      <p id="googleModalDesc">El backend ya está preparado para validar cuentas de Google. Esta opción se habilitará cuando se configuren las credenciales oficiales. Por ahora, inicia sesión con tu correo y contraseña.</p>
       <button class="btn-primary" id="btnGoogleModalOk">Entendido</button>
     </div>
   </div>

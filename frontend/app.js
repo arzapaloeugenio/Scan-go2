@@ -209,6 +209,37 @@ function limpiarPerfilLocalInventado() {
     if (!tieneIdBackend) localStorage.removeItem("tottus_user");
   } catch { /* perfil corrupto: se ignora */ }
 }
+
+// ---------- SESIÓN REAL (registro/login por correo y contraseña) ----------
+// Proyección pública: solo los datos que ya consume el frontend. Nunca
+// contraseñas, hashes ni tokens. Devuelve null si el id del backend no es válido.
+function guardarSesionCliente(data) {
+  if (!data || typeof data !== "object") return null;
+  const id = Number(data.id);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const ageRaw = data.edad == null ? NaN : Number(data.edad);
+  const profile = {
+    id,
+    name: String(data.nombre == null ? "" : data.nombre).trim() || "Cliente",
+    email: String(data.correo == null ? "" : data.correo).trim(),
+    dni: data.dni == null ? "" : String(data.dni).trim(),
+    birth: data.fechaNacimiento == null ? "" : String(data.fechaNacimiento),
+    age: Number.isInteger(ageRaw) && ageRaw >= 0 ? ageRaw : null,
+    isAdult: data.esAdulto === true,
+  };
+  try { localStorage.setItem("tottus_user", JSON.stringify(profile)); } catch { /* storage bloqueado */ }
+  demoMode = false;
+  return profile;
+}
+
+// Mensaje breve de estado junto al formulario (carga, error o éxito).
+function setFormStatus(el, msg, type) {
+  if (!el) return;
+  el.textContent = msg || "";
+  el.hidden = !msg;
+  el.classList.toggle("is-error", !!msg && type === "error");
+  el.classList.toggle("is-success", !!msg && type === "success");
+}
 // Estado del pago/retiro
 let order = null; // { ticketId, method, total, items, subtotal, igv, saving, qty, caja:{code,token,exp,used}, salida:{...}, status }
 let qrTimer = null;
@@ -402,6 +433,7 @@ function clearRegisterErrors() {
   });
   const ok = $("registerSuccess");
   if (ok) { ok.hidden = true; ok.textContent = ""; }
+  setFormStatus($("registerError"), "");
 }
 function validateRegisterField(field) {
   const val = (id) => ($(id) ? $(id).value : "");
@@ -1513,7 +1545,7 @@ Items: ${q}/${MAX_ITEMS}`;
 // carritoController.registrarCompra). El backend recalcula precios, subtotales
 // y total en PostgreSQL (transacción BEGIN/COMMIT/ROLLBACK); el frontend nunca
 // envía precios ni totales como fuente de verdad.
-// Identificador real del cliente identificado (por DNI) guardado en
+// Identificador real del cliente (registro/login por correo) guardado en
 // localStorage['tottus_user']. Devuelve null en demo o sin sesión válida.
 // El modo demo se distingue solo con demoMode, nunca por el ID del cliente.
 function currentClienteId() {
@@ -1767,21 +1799,71 @@ async function init() {
 
   if (!window._registerBound) {
     window._registerBound = true;
-    $("loginForm").addEventListener("submit", (e) => {
+    $("loginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      // NOTA TÉCNICA: sin backend no se crea una cuenta real; el registro real
-      // requiere servidor + almacenamiento seguro (hash de contraseña, nunca en localStorage).
+      // Validaciones locales existentes (campos y mensajes ya usados).
       const { ok, firstBad } = validateRegisterAll();
       if (!ok) {
         if (firstBad && $(firstBad)) $(firstBad).focus({ preventScroll: false });
         return;
       }
-      // Etapa 3: se retiró el mensaje temporal de prueba/desarrollo
-      // ("Se requiere un servidor para crear una cuenta real"). El registro
-      // local de la demo solo valida el formulario. Por seguridad, nunca se
-      // guardan ni registran contraseñas.
-      if ($("loginPass")) $("loginPass").value = "";
-      if ($("loginPassConfirm")) $("loginPassConfirm").value = "";
+      const form = $("loginForm");
+      const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
+      const btnTexto = submitBtn ? submitBtn.textContent : "";
+      const nombre = ($("loginName").value || "").trim();
+      const correo = ($("loginEmail").value || "").trim().toLowerCase();
+      const password = $("loginPass").value || "";
+      const passwordConfirm = $("loginPassConfirm").value || "";
+      const dni = ($("loginDNI").value || "").trim();
+      const fechaNacimiento = $("loginBirth").value || "";
+      const errBox = $("registerError");
+      const okBox = $("registerSuccess");
+      setFormStatus(errBox, "");
+      if (okBox) { okBox.hidden = true; okBox.textContent = ""; }
+      // Evita envíos duplicados y muestra el estado de carga.
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Creando cuenta…"; }
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/clientes/registro`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          // Contrato exacto del backend: sin edad, esAdulto, id ni datos demo.
+          body: JSON.stringify({ nombre, dni, correo, password, passwordConfirm, fechaNacimiento }),
+        });
+        // Un solo parseo: cuerpo no JSON se trata como respuesta inesperada.
+        let payload = null;
+        try { payload = await response.json(); } catch { payload = null; }
+        if (response.status === 409) {
+          // Cuenta ya existente: se conserva el formulario para corregir datos.
+          setFormStatus(errBox, (payload && payload.message) || "Ya existe una cuenta con esos datos.", "error");
+          return;
+        }
+        if (!response.ok || !payload || payload.success !== true) {
+          const msg = (payload && typeof payload.message === "string" && payload.message)
+            ? payload.message
+            : "No se pudo crear la cuenta. Inténtalo nuevamente.";
+          setFormStatus(errBox, msg, "error");
+          return;
+        }
+        // Registro correcto: la respuesta segura ya trae el cliente creado.
+        const profile = guardarSesionCliente(payload.data);
+        if (!profile) {
+          setFormStatus(errBox, "Respuesta inesperada del servidor. Inténtalo de nuevo.", "error");
+          return;
+        }
+        ["loginName", "loginEmail", "loginPass", "loginPassConfirm", "loginDNI", "loginBirth"]
+          .forEach((id) => { const el = $(id); if (el) el.value = ""; });
+        clearRegisterErrors();
+        const firstName = String(profile.name).split(" ")[0];
+        setFormStatus(okBox, "Cuenta creada correctamente. ¡Bienvenido/a!", "success");
+        updateAuthUI();
+        cargarHistorialRemoto();
+        toast(`✅ Cuenta creada. ¡Bienvenido/a, ${firstName}!`);
+      } catch (error) {
+        // Error de red: mensaje controlado, sin sesión falsa ni modo demo.
+        setFormStatus(errBox, "No se pudo conectar con el servidor. Inténtalo nuevamente.", "error");
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = btnTexto || "Crear cuenta"; }
+      }
     });
     // DNI: solo números, máximo 8 caracteres.
     const dniInput = $("loginDNI");
@@ -1818,7 +1900,7 @@ async function init() {
   function openGoogleModal() {
     const modal = $("googleModal");
     if (!modal) {
-      toast("Acceso con Google próximamente. Por ahora, continúa con tu DNI.");
+      toast("Acceso con Google próximamente. Por ahora, inicia sesión con tu correo y contraseña.");
       return;
     }
     googleModalTrigger = document.activeElement;
@@ -1852,99 +1934,8 @@ async function init() {
     });
   }
 
-  // ---------- Ingreso por DNI (identificación contra el backend) ----------
-  // El DNI IDENTIFICA al cliente dentro del prototipo académico; no es
-  // autenticación de alta seguridad. Se consulta la ruta real
-  // POST /api/clientes/dni y, si el cliente existe, se continúa el flujo actual.
-  function setDniLoginError(msg) {
-    const err = $("dniLoginError");
-    const input = $("dniLogin");
-    const ok = !msg;
-    if (err) { err.hidden = ok; if (!ok) err.textContent = msg; }
-    if (input) input.setAttribute("aria-invalid", String(!ok));
-    return ok;
-  }
-  async function ingresarConDni(event) {
-    if (event) event.preventDefault();
-    const input = $("dniLogin");
-    const btn = $("btnDniLogin");
-    // 2) Quitar espacios innecesarios.
-    const dni = input ? String(input.value || "").replace(/\s+/g, "") : "";
-
-    // 4) Evitar solicitudes con el campo vacío.
-    if (dni === "") { setDniLoginError("Ingresa tu DNI."); return; }
-    // 3) Validar el formato esperado por el proyecto (8 dígitos).
-    if (!/^\d{8}$/.test(dni)) { setDniLoginError("El DNI debe tener exactamente 8 números."); return; }
-    setDniLoginError("");
-
-    const btnTexto = btn ? btn.textContent : "";
-    // 5) Desactivar el botón + 6) indicador breve de carga mientras se procesa.
-    if (btn) { btn.disabled = true; btn.textContent = "Verificando…"; }
-
-    try {
-      // 7) Consultar la ruta real del backend.
-      const response = await fetch(`${API_BASE_URL}/api/clientes/dni`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dni }),
-      });
-
-      // 9) Mensaje claro si el DNI no está registrado.
-      if (response.status === 404) {
-        setDniLoginError("El DNI no está registrado. Verifica el número o usa «Ver demostración».");
-        return;
-      }
-      if (!response.ok) {
-        setDniLoginError("No se pudo validar el DNI en este momento. Inténtalo de nuevo.");
-        return;
-      }
-
-      let payload = null;
-      try { payload = await response.json(); } catch { payload = null; }
-      const cliente = payload && payload.data;
-      if (!cliente || !cliente.id) {
-        setDniLoginError("Respuesta inesperada del servidor. Inténtalo de nuevo.");
-        return;
-      }
-
-      // 8/3) Cliente identificado: se reutiliza el estado existente
-      // (localStorage['tottus_user']) y se continúa el flujo actual de Scan & Go.
-      const profile = {
-        id: cliente.id,
-        name: cliente.nombre || "Cliente",
-        dni: cliente.dni || dni,
-        email: "",
-        birth: "",
-        age: null,
-        isAdult: true,
-      };
-      try { localStorage.setItem("tottus_user", JSON.stringify(profile)); } catch { /* noop */ }
-      demoMode = false;
-      if (input) input.value = "";
-      updateAuthUI();
-      cargarHistorialRemoto();
-      const firstName = String(profile.name).split(" ")[0];
-      toast(`👋 Bienvenido/a, ${firstName}`);
-      botSay(`👋 <b>¡Hola, ${firstName}!</b> Soy <b>Tobi</b> 🤖. Escanea con 📷 <b>Escanear</b>, paga desde tu celular y valida en caja y salida. ¡Sin colas!`);
-    } catch (error) {
-      // 10) Error de conexión controlado: no bloquea la interfaz.
-      setDniLoginError("No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.");
-    } finally {
-      // 11) Reactivar el botón al finalizar.
-      if (btn) { btn.disabled = false; btn.textContent = btnTexto || "Ingresar con DNI"; }
-    }
-  }
-  if (!window._dniLoginBound) {
-    window._dniLoginBound = true;
-    const dniForm = $("dniLoginForm");
-    if (dniForm) dniForm.addEventListener("submit", ingresarConDni);
-    const dniInputLogin = $("dniLogin");
-    if (dniInputLogin) dniInputLogin.addEventListener("input", () => {
-      const clean = dniInputLogin.value.replace(/\D/g, "").slice(0, 8);
-      if (dniInputLogin.value !== clean) dniInputLogin.value = clean;
-      if (dniInputLogin.value) setDniLoginError("");
-    });
-  }
+  // Compatibilidad: POST /api/clientes/dni se conserva en el backend, pero ya
+  // no existe ningún mecanismo de inicio de sesión por DNI en la interfaz.
 
   // Login mejorado: ver/ocultar contraseña
   $("btnTogglePass").addEventListener("click", () => {
@@ -1992,7 +1983,8 @@ async function init() {
       if (card) { card.hidden = false; card.setAttribute("aria-hidden", "false"); }
       if ($("btnGoLogin")) $("btnGoLogin").setAttribute("aria-expanded", "true");
       if ($("btnGoRegister")) $("btnGoRegister").setAttribute("aria-expanded", "false");
-      const firstField = $("dniLogin") || $("authEmail");
+      setFormStatus($("authStatus"), "");
+      const firstField = $("authEmail");
       if (firstField) setTimeout(() => firstField.focus({ preventScroll: false }), 50);
     }
     function showRegister(opener) {
@@ -2027,6 +2019,7 @@ async function init() {
         const i = $(id);
         if (i) i.removeAttribute("aria-invalid");
       });
+      setFormStatus($("authStatus"), "");
       // Limpieza del registro al volver a la bienvenida: sin recarga ni cambio de URL.
       clearRegisterErrors();
       if ($("loginPass")) $("loginPass").value = "";
@@ -2054,7 +2047,7 @@ async function init() {
     const btnSwitchToRegister = $("btnGoRegisterFromLogin");
     if (btnSwitchToRegister) btnSwitchToRegister.addEventListener("click", () => showRegister(btnSwitchToRegister));
     const btnForgot = $("btnForgotPass");
-    if (btnForgot) btnForgot.addEventListener("click", () => toast("Recuperación no disponible en la demo"));
+    if (btnForgot) btnForgot.addEventListener("click", () => toast("Recuperación de contraseña próximamente"));
     const btnToggleAuth = $("btnToggleAuthPass");
     if (btnToggleAuth) btnToggleAuth.addEventListener("click", () => {
       const i = $("authPass");
@@ -2063,9 +2056,9 @@ async function init() {
       btnToggleAuth.textContent = i.type === "password" ? "👁️" : "🙈";
     });
     const emailForm = $("emailLoginForm");
-    if (emailForm) emailForm.addEventListener("submit", (e) => {
+    if (emailForm) emailForm.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const email = ($("authEmail").value || "").trim();
+      const email = ($("authEmail").value || "").trim().toLowerCase();
       const pass = $("authPass").value || "";
       const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
       const errMail = $("authEmailError");
@@ -2082,13 +2075,48 @@ async function init() {
       }
       $("authPass").setAttribute("aria-invalid", String(!passOk));
       if (!emailOk || !passOk) return;
-      // No existe backend de correo/contraseña: NO se crea ni se guarda ningún
-      // perfil, correo ni contraseña (nada se envía al servidor). Se entra al
-      // modo demostración, que queda claramente identificado ("Modo
-      // demostración") y no representa una sesión autenticada.
-      $("authEmail").value = "";
-      $("authPass").value = "";
-      enterDemo();
+      const statusBox = $("authStatus");
+      const submitBtn = emailForm.querySelector('button[type="submit"]');
+      const btnTexto = submitBtn ? submitBtn.textContent : "";
+      setFormStatus(statusBox, "Iniciando sesión…");
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Iniciando sesión…"; }
+      try {
+        // Autenticación real contra el backend (sin cookies, tokens ni demo).
+        const response = await fetch(`${API_BASE_URL}/api/clientes/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ correo: email, password: pass }),
+        });
+        let payload = null;
+        try { payload = await response.json(); } catch { payload = null; }
+        if (!response.ok || !payload || payload.success !== true) {
+          const msg = (payload && typeof payload.message === "string" && payload.message)
+            ? payload.message
+            : (response.status === 400 || response.status === 401
+              ? "Correo o contraseña incorrectos."
+              : "No se pudo iniciar sesión. Inténtalo nuevamente.");
+          // 400/401/500: mensaje controlado, sin perfil ni modo demo.
+          setFormStatus(statusBox, msg, "error");
+          return;
+        }
+        // Solo se acepta la sesión si el backend devuelve un id entero > 0.
+        const profile = guardarSesionCliente(payload.data);
+        if (!profile) {
+          setFormStatus(statusBox, "Respuesta inesperada del servidor. Inténtalo de nuevo.", "error");
+          return;
+        }
+        $("authEmail").value = "";
+        $("authPass").value = "";
+        setFormStatus(statusBox, "");
+        updateAuthUI();
+        cargarHistorialRemoto();
+        toast(`👋 Bienvenido/a, ${String(profile.name).split(" ")[0]}`);
+      } catch (error) {
+        // Error de red: no se crea sesión falsa ni se activa el modo demo.
+        setFormStatus(statusBox, "No se pudo conectar con el servidor. Inténtalo nuevamente.", "error");
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = btnTexto || "Ingresar"; }
+      }
     });
   }
 

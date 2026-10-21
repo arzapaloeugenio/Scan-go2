@@ -17,7 +17,7 @@
 | O2 | Carrito virtual (máx. 40 productos, compra rápida) | ✅ `MAX_ITEMS=40` con barra de progreso, bloqueo y modal a caja tradicional |
 | O15 | RN-CAJA-RÁPIDA: tope 40 + modal bloqueante | ✅ `isFastLimitReached/showFastLimitModal` + `#fastLimitModal` responsive; validación+render+total <2s |
 | O3 | IGV 18 % desglosado (precios incluyen IGV) | ✅ `Subtotal = Total / 1.18` |
-| O4 | Inicio de sesión + acceso demo + RN02 edad | ✅ nombre/email/clave + DNI 8 dígitos + fecha nacimiento; `calcAge/isAdultUser` |
+| O4 | Inicio de sesión real + acceso demo + RN02 edad | ✅ correo/contraseña contra `POST /api/clientes/login` + alta real; demo solo con `#btnDemo`; DNI 8 dígitos + fecha de nacimiento en el registro; `calcAge/isAdultUser` |
 | O5 | Catálogo con descuentos visibles | ✅ 14 productos, etiquetas `-%`, badge `+18`, filtro Ofertas, buscador |
 | O6 | Pago desde el celular (meta ≤60s) | ✅ simulado (Yape / Plin / Tarjeta con form demo) + cronómetro `payT0` |
 | O11 | RN02 bloqueo licores <18 | ✅ `restricted:true` + toast 🔞 + `(menor 🔞)` en header |
@@ -60,9 +60,9 @@ app.js → tobi-allergens.js → tobi-discounts.js → tobi-recipes.js →
 tobi-profile.js → tobi-history.js → tobi-chat.js
 ```
 - `tobi-chat.js` nunca modifica `app.js`: reutiliza sus globales solo con guardas (`typeof showView/stopCamera/botClose/toast === "function"`).
-- El SW (`tottus-scan-go-v10`, cache-first) precachea el app shell + los 6 `tobi-*.js`.
+- El SW (`tottus-scan-go-v11`, cache-first) precachea el app shell + los 6 `tobi-*.js`.
 
-- **Sin servidor:** toda la lógica corre en el cliente. El “pago”, la “caja” y “seguridad” son simulaciones con botones demo + ingreso manual de 6 dígitos (en producción se reemplazarían por pasarela real y escáner del personal).
+- **SPA con backend PERN:** el frontend concentra la interfaz y la lógica de cliente, pero catálogo, autenticación (registro/login por correo), historial y órdenes consumen la API Node/Express/PostgreSQL vía `API_BASE_URL`. El “pago”, la “caja” y “seguridad” siguen siendo simulaciones con botones demo + ingreso manual de 6 dígitos (en producción se reemplazarían por pasarela real y escáner del personal).
 - **Vistas SPA:** `login · home · scanner · cart · checkout · tobi`, conmutadas con `showView(nombre)` (una visible a la vez; la vista `tobi` la conmuta `tobi-chat.js` reutilizando `showView` para volver).
 
 ## 3. Estructura de archivos
@@ -85,9 +85,10 @@ tobi-profile.js → tobi-history.js → tobi-chat.js
 ### 4.1 Autenticación (`getUser`, `updateAuthUI`, RN02)
 - Bienvenida minimalista (`#view-login`): tarjeta verde con logotipo blanco (`img/Logo_Tottus-blanco.png`, texto blanco + puntos amarillos, transparente y recortada al contenido) y tres accesos: el ícono circular «G» (`#btnGoogleAccess`, Google «próximamente»), `#btnGoLogin` amarillo («Iniciar sesión») y `#btnDemo` transparente con borde blanco («Ver demostración»); `min-height:52px`, `max-width:380px` internos. Estado inicial: solo bienvenida visible; los formularios de login (`#loginCard`) y registro (`#loginForm`) con `hidden` + `display:none !important`.
 - Apertura por JavaScript con botones `type="button"` (sin `href="#..."`): “Iniciar sesión” oculta el intro y muestra solo `#loginCard`; “Crear cuenta” muestra solo `#loginForm` (titulado “Crear cuenta”); “Volver” (`#btnBackToWelcome` / `#btnBackToWelcomeReg`) restaura la bienvenida, devuelve el foco al botón de origen y limpia el hash vía `history.replaceState` sin recargar. Guardia `window._emailLoginBound` evita listeners duplicados.
-- Login por correo (`#emailLoginForm`, «Acceso de demostración»): solo email + contraseña con etiquetas visibles, toggle 👁️ (`#btnToggleAuthPass`), enlace visual “¿Olvidaste tu contraseña?” (toast, sin recuperación real) y errores bajo cada campo (`.field-error`). Valida formato de email y contraseña no vacía con `preventDefault`; **no hay backend de correo/contraseña**: no se guarda ni se envía el correo ni la contraseña y **no se crea perfil**; al validar entra al modo demostración (`enterDemo()`).
-- Registro (`#loginForm`): nombre (≥3), email válido, clave (≥4, 👁️), **DNI 8 dígitos** (`/^\d{8}$/`), **fecha nacimiento** obligatoria. Valida el formulario y limpia las contraseñas; **no crea una cuenta real ni guarda contraseñas** (el alta real requiere servidor).
-- **Botón demo** `#btnDemo` («Ver demostración», en el hero): entra a un modo de prueba **solo en memoria** (`demoMode`), etiquetado con el distintivo permanente «Modo demostración» (`#demoBadge`), sin formularios, sin credenciales y sin crear perfil de cliente. El acceso de correo de la demo usa el mismo `enterDemo()`.
+- Login real (`#emailLoginForm`): correo + contraseña con etiquetas visibles, toggle 👁️ (`#btnToggleAuthPass`), enlace visual “¿Olvidaste tu contraseña?” (toast; recuperación aún no implementada) y errores bajo cada campo (`.field-error`). Normaliza el correo con trim + lowercase, valida formato y contraseña no vacía, deshabilita el submit y muestra “Iniciando sesión…” en `#authStatus`. Envía `POST ${API_BASE_URL}/api/clientes/login` y solo acepta la sesión con HTTP OK, `success:true` e `id` entero > 0. Un 400/401/500 o un error de red muestra un mensaje controlado y **no** entra a la demo.
+- Registro real (`#loginForm`): nombre (≥3), correo, clave (≥4, 👁️), confirmación, **DNI 8 dígitos** (`/^\d{8}$/`) y **fecha de nacimiento** obligatoria. Envía `POST ${API_BASE_URL}/api/clientes/registro` con `{ nombre, dni, correo, password, passwordConfirm, fechaNacimiento }`; un 201 con `id` válido guarda la sesión real, limpia todos los campos (incluidas ambas contraseñas) e informa “Cuenta creada correctamente”. Un 400/409 o error de red conserva el formulario y muestra el mensaje controlado.
+- **El DNI es solo un dato de registro:** el formulario visible de ingreso por DNI (`#dniLoginForm`, `#dniLogin`, `#btnDniLogin`, `ingresarConDni()`) fue retirado de la interfaz en la Fase 5. `POST /api/clientes/dni` permanece en el backend por compatibilidad, pero ya no se usa como autenticación.
+- **Botón demo** `#btnDemo` («Ver demostración», en el hero): **única vía** para entrar al modo de prueba **solo en memoria** (`demoMode`), etiquetado con el distintivo permanente «Modo demostración» (`#demoBadge`), sin formularios, sin credenciales y sin crear perfil de cliente. El login por correo ya no invoca `enterDemo()`.
 - Menor: header `(menor 🔞)` + bloqueo de licores; sesión persistente; “Salir” borra usuario, detiene cámara y timer QR.
 
 ### 4.2 Catálogo y ofertas (`renderProducts`, RN02)
@@ -258,7 +259,7 @@ saving   = Σ((oldPrice - price) × qty)
 ```js
 PRODUCTS[i] = { id, name, brand, price, oldPrice|null, code, emoji, cat, discount, restricted? }
 cart        = { "7750123…": qty }
-tottus_user = { id, name, dni, email, birth, age, isAdult }  // `id` real del backend (ingreso por DNI); el modo demostración NO se persiste
+tottus_user = { id, name, dni, email, birth, age, isAdult }  // sesión real mínima: `id` entero > 0 del backend (registro/login por correo); `isAdult` proviene de `data.esAdulto`; el modo demostración NO se persiste
 order = {
   ticketId, method, total, subtotal, igv, saving, qty, paySecs,
   items: {...cart},
@@ -287,6 +288,7 @@ tobi_discounts_mentioned = "1" (sessionStorage, mención de ofertas 1×/visita)
 **Fase 2 — Validaciones:** `tottus_order` + `restoreOrderUI()`, `scanT0/payT0` discretos, `btnCheckout` deshabilitado, boleta SUNAT demo + `window.print()`.
 **Fase 3 — Experiencia:** `tottus_history`, `beep()` WebAudio, `#cardForm` con validación de formato, `manifest.json + sw.js`.
 **Fase 4 — Docs:** actualización de este archivo + texto listo para pegar en el Word del informe.
+**Fase 5 — Autenticación real (2026-10-21):** registro (`POST /api/clientes/registro`) e inicio de sesión (`POST /api/clientes/login`) con correo y contraseña, hash bcrypt (costo 10), migración `002-add-password-hash-clientes.sql`, sesión local mínima y retiro del login por DNI de la interfaz.
 **Regla de trabajo:** un cambio por vez, diff pequeño, `node --check`, prueba en `http://localhost:8000` (cámara requiere localhost/https).
 
 ## 6. Diseño (verde + blanco, dinámico)
@@ -307,14 +309,15 @@ cd frontend
 python3 -m http.server 8000
 # abrir http://localhost:8000  (localhost/https requerido para la cámara)
 ```
-1. Pulsa **Ver demostración** (o «Iniciar sesión» → ingresa con tu DNI si ya eres cliente). El botón «G» de Google muestra solo el aviso «próximamente».
+1. Pulsa **Iniciar sesión** e ingresa tu **correo y contraseña** (cuenta real), o **Crear cuenta** si aún no tienes una. **Ver demostración** abre el modo de prueba sin credenciales. El botón «G» de Google muestra solo el aviso «próximamente».
 2. Agrega productos o usa **📷 Escanear** (o pega un código de “códigos de prueba”).
 3. Ve a **🛒 Carrito → Finalizar compra → Pagar desde el celular → Pagar ahora**.
 4. Muestra el QR en **Caja → ✅ Validar en Caja**, luego el pase en **Seguridad → Validar salida**.
 5. Presiona la **T** de Tobi → **💬 Chatear con Tobi** (historial 🕘, alergias 🛡️, productos 🛒, recetas 🍲, ofertas 🏷️, lista 🧾).
 
 ## 8. Limitaciones conocidas (demo)
-- Sin backend: pago, caja y seguridad son simulados; cualquiera puede pulsar “validar”. `localStorage` (`tottus_cart/order/history/user`) es manipulable; en producción usar pasarela real + HMAC/JWT en servidor con nonces.
+- **Pago, caja y seguridad siguen simulados:** cualquiera puede pulsar “validar”. `localStorage` (`tottus_cart/order/history/user`) es manipulable; en producción usar pasarela real + HMAC/JWT en servidor con nonces.
+- **Sesión local mínima:** el registro/login reales validan credenciales contra la API y guardan solo la proyección pública en `localStorage['tottus_user']` (sin contraseñas, hashes ni tokens). No hay JWT, cookies ni sesión de servidor: cerrar sesión borra ese perfil local y la recuperación de contraseña aún no está implementada.
 - Firma QR demo (`simpleHash` + secreto en cliente); tarjeta demo solo valida formato.
 - Escáner Quagga2 exclusivamente por CDN (`https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js`, sin copia local ni npm): requiere internet y permiso de cámara; si el CDN falla, el escaneo se deshabilita con el aviso en `#scannerStatus` y se continúa por ingreso manual (`#manualCode/#btnManualAdd`) + `beep()`. El SW cachea el app shell, no el CDN.
 - QR de pago por CDN (`qrcode@1.5.3`) requiere internet; sin él solo placeholder (`fallbackQR()`). SW cachea app shell, no los CDN.
@@ -329,6 +332,7 @@ python3 -m http.server 8000
 - [x] Boleta imprimible demo (hecho con `window.print()`); pendiente boleta electrónica SUNAT real en PDF.
 - [ ] Catálogo real con imágenes, stock y precios por tienda.
 - [x] PWA mínima (hecho `manifest.json + sw.js`); pendiente notificaciones + offline total (CDN QR).
+- [ ] Recuperación de contraseña y sesión persistente con token (hoy la sesión real es local y mínima, sin JWT ni cookies).
 - [ ] Tobi con IA real (endpoint propio tras `getTobiReply`), perfil e historial en backend con sesión, y datos validados (precios, alérgenos de fabricantes, recetas de nutricionista).
 
 ## 10. Pruebas manuales sugeridas
@@ -336,6 +340,7 @@ python3 -m http.server 8000
 1b. RN02: login 2015 → cerveza `...0136` bloquea 🔞; demo sí deja; badge `+18` visible.
 1c. Perf: scan muestra `⏱️ Xs (meta <3s)`; pago muestra `aprobado en Xs (meta ≤60s)`; tarjeta `4111111111111111 12/28 123` ok, `123` falla.
 1d. Persistencia: paga → recarga → `🔄 Retomaste tu pago pendiente` con QR redibujado; termina → aparece en Historial; Imprimir abre PDF.
+1e. Autenticación real (pendiente de prueba manual): **Crear cuenta** con datos válidos → 201, perfil en `tottus_user` e ingreso al dashboard; **Iniciar sesión** con esa cuenta → 200; credenciales incorrectas → 401 con mensaje bajo el formulario; correo o DNI duplicado → 409; backend apagado → mensaje de conexión, sin sesión y sin demo.
 1b. TOBI: entrar con demo → saluda con "Cliente"; registrarse como "María" → saluda con "María".
 1c. Confeti: completar flujo caja+salida → lluvia de confeti verde/blanco/dorado + "🎊 ¡Felicidades por tu compra!".
 2. IGV: total S/ 118.00 → subtotal S/ 100.00, IGV S/ 18.00.
@@ -351,12 +356,41 @@ python3 -m http.server 8000
 
 ## Historial de cambios técnicos
 
-### Ingreso por DNI + Google «próximamente» (Etapa 3, 2026-10-17/18)
-- **El ingreso por DNI está activo.** En `#loginCard` el formulario `#dniLoginForm` pide el DNI, lo limpia (sin espacios, solo dígitos, máx. 8), valida el formato (exactamente 8 dígitos) y **evita solicitudes vacías**. Mientras consulta, deshabilita `#btnDniLogin` y muestra «Verificando…»; al terminar lo reactiva (éxito o error).
-- Consulta la **ruta real del backend** `POST /api/clientes/dni` (`{ dni }`, `API_BASE_URL`). `200` → identifica al cliente (`id`, `nombre`, `dni`); `404` → «El DNI no está registrado…»; error de red → mensaje controlado sin bloquear la interfaz.
-- **El DNI identifica al cliente dentro del prototipo académico; NO es autenticación de alta seguridad** (no hay contraseña ni token). El estado reutiliza el sistema existente `localStorage['tottus_user']` (ahora con `id` real); `currentClienteId()` usa ese `id` (o el cliente demo `USUARIO_DEMO_ID`) para historial y registro de compra. Se conservan el lector de códigos, el carrito y el flujo de pago sin cambios.
-- **Google queda preparado en el backend pero desactivado en el frontend.** El botón «G» (`#btnGoogleAccess`) **no** llama a `POST /api/auth/google`, **no** carga Google Identity Services, **no** abre formularios ni crea usuarios: solo abre un **modal propio de Scan & Go** (`#googleModal`), cerrable con «Entendido», con el botón ✕ o con `Escape`, con `role="dialog"`, `aria-modal`, `aria-label` y foco gestionado. Muestra: «Acceso con Google próximamente» + «El backend ya está preparado para validar cuentas de Google. Esta opción se habilitará cuando se configuren las credenciales oficiales. Por ahora, continúa con tu DNI.» No imita el selector oficial de Google ni pide correo, contraseña o nombre. Para habilitarlo se necesitará `GOOGLE_CLIENT_ID` y conectar el `credential` real.
-- **Modo demostración claramente identificado:** el acceso «Ver demostración» (botón `#btnDemo`) o el acceso de correo de la demo (`#emailLoginForm`) entra a un modo de prueba de **solo memoria** (`demoMode`) —nunca se persiste— que muestra el distintivo permanente «Modo demostración» (`#demoBadge`), no pide ni guarda correos, no crea un perfil de cliente y no representa una sesión autenticada.
+### Fase 5 — Registro e inicio de sesión reales con correo y contraseña (2026-10-21)
+**Objetivo:** conectar los formularios existentes con los endpoints reales, conservar una sesión mínima segura, mantener la demo separada y retirar el DNI como mecanismo de inicio de sesión.
+
+**Backend (Node/Express/PostgreSQL):**
+- Dependencia nueva: `bcryptjs ^3.0.3` (única añadida). `BCRYPT_ROUNDS = 10`.
+- `POST /api/clientes/registro` → valida nombre (≥3), DNI (8 dígitos), correo (formato), contraseña (≥4) y confirmación, y fecha de nacimiento real/no futura. Normaliza `correo` con trim + lowercase, detecta duplicados por correo y DNI (409) y responde **201** con `{ success: true, data }`.
+- `POST /api/clientes/login` → normaliza el correo y compara el hash con `bcrypt.compare`. Credenciales inválidas devuelven **401** con el mensaje genérico «Correo o contraseña incorrectos.» (misma respuesta si la cuenta no existe o no tiene contraseña).
+- La proyección pública (`clienteSesionPublico`) devuelve `id`, `nombre`, `correo`, `dni`, `fechaNacimiento`, `edad` y **`esAdulto`**; nunca incluye `password_hash`.
+- Nuevas funciones de modelo: `buscarPorCorreo`, `buscarPorCorreoConPassword` (uso interno del login) y `crearConPassword` (solo persiste el hash). Se conservan `identificarPorDni`, `buscarPorDni` y la ruta `POST /api/clientes/dni` por compatibilidad.
+- **Sin JWT, cookies, `Authorization` ni sesión de servidor**, según el alcance de la fase.
+
+**Base de datos:**
+- Migración `database/migrations/002-add-password-hash-clientes.sql`: `ALTER TABLE public.cliente ADD COLUMN IF NOT EXISTS password_hash TEXT;` (nullable, sin `DEFAULT`, idempotente). Ya aplicada manualmente en Neon; no se reejecuta en las validaciones.
+
+**Frontend:**
+- Login real en `#emailLoginForm` contra `${API_BASE_URL}/api/clientes/login`, con estados “Iniciando sesión…”, errores bajo el formulario (`#authStatus`), botón deshabilitado durante la petición y restauración en `finally`.
+- Registro real en `#loginForm` contra `${API_BASE_URL}/api/clientes/registro` con el contrato `{ nombre, dni, correo, password, passwordConfirm, fechaNacimiento }`, mensajes de éxito/error (`#registerSuccess`, `#registerError`) y limpieza de todos los campos al crear la cuenta.
+- Helper común `guardarSesionCliente()`: guarda en `localStorage['tottus_user']` exactamente `{ id, name, email, dni, birth, age, isAdult }`; exige `id` entero > 0 y **no** guarda contraseñas, confirmaciones, hashes ni tokens.
+- Corrección del mapeo: `isAdult` se construye con **`data.esAdulto === true`** (antes se leía por error `data.esAdult`), aplicado tanto a registro como a login.
+- **Retiro del login por DNI de la interfaz:** se eliminaron `#dniLoginForm`, `#dniLogin`, `#dniLoginError`, `#btnDniLogin`, el separador `o`, las funciones `setDniLoginError()` / `ingresarConDni()` y su listener. El DNI sigue siendo obligatorio en “Crear cuenta”.
+- La demo queda separada: `#btnDemo` es la **única** vía de `enterDemo()`; ni el login ni el registro ni sus errores activan el modo demo.
+- Estilos mínimos `.form-status` (carga/error/éxito) con `aria-live` ya existente en los párrafos de estado.
+
+**Verificación:**
+- `node --check` OK en `backend/src/models/clienteModel.js`, `backend/src/controllers/clienteController.js`, `backend/src/routes/clienteRoutes.js` y `frontend/app.js`; `git diff --check` sin errores.
+- No se ejecutaron POST reales, no se creó ningún cliente y no se ejecutó SQL durante la implementación/revisión.
+- Pendiente: prueba manual de registro/login (éxito, 400, 401, 409 y backend caído) en local o producción.
+- Archivos de la fase: `backend/package.json`, `backend/package-lock.json`, `backend/src/models/clienteModel.js`, `backend/src/controllers/clienteController.js`, `backend/src/routes/clienteRoutes.js`, `frontend/app.js`, `frontend/index.html`, `frontend/styles.css`, `database/migrations/002-add-password-hash-clientes.sql` y esta documentación.
+
+### Ingreso por DNI + Google «próximamente» (Etapa 3, 2026-10-17/18) — histórico
+- **El ingreso por DNI estuvo activo hasta la Fase 5 (2026-10-21), cuando se retiró de la interfaz.** En `#loginCard` el formulario `#dniLoginForm` pedía el DNI, lo limpiaba (sin espacios, solo dígitos, máx. 8), validaba el formato (exactamente 8 dígitos) y **evitaba solicitudes vacías**. Mientras consultaba, deshabilitaba `#btnDniLogin` y mostraba «Verificando…»; al terminar lo reactivaba (éxito o error).
+- Histórico: consultaba la **ruta real del backend** `POST /api/clientes/dni` (`{ dni }`, `API_BASE_URL`). `200` → identificaba al cliente (`id`, `nombre`, `dni`); `404` → «El DNI no está registrado…»; error de red → mensaje controlado sin bloquear la interfaz.
+- **El DNI identificaba al cliente dentro del prototipo académico; no era autenticación de alta seguridad** (sin contraseña ni token). El estado reutilizaba `localStorage['tottus_user']` con el `id` real y `currentClienteId()` usaba ese `id` para historial y compra. **Retirado en la Fase 5:** ya no se ofrece como login; el DNI solo se usa como dato obligatorio del registro.
+- **Google queda preparado en el backend pero desactivado en el frontend.** El botón «G» (`#btnGoogleAccess`) **no** llama a `POST /api/auth/google`, **no** carga Google Identity Services, **no** abre formularios ni crea usuarios: solo abre un **modal propio de Scan & Go** (`#googleModal`), cerrable con «Entendido», con el botón ✕ o con `Escape`, con `role="dialog"`, `aria-modal`, `aria-label` y foco gestionado. Muestra: «Acceso con Google próximamente» + «El backend ya está preparado para validar cuentas de Google. Esta opción se habilitará cuando se configuren las credenciales oficiales. Por ahora, inicia sesión con tu correo y contraseña.» No imita el selector oficial de Google ni pide correo, contraseña o nombre. Para habilitarlo se necesitará `GOOGLE_CLIENT_ID` y conectar el `credential` real.
+- **Modo demostración claramente identificado:** la demo se activa **únicamente** con el botón «Ver demostración» (`#btnDemo`) y entra a un modo de prueba de **solo memoria** (`demoMode`) —nunca se persiste— que muestra el distintivo permanente «Modo demostración» (`#demoBadge`), no pide ni guarda correos, no crea un perfil de cliente y no representa una sesión autenticada. Desde la Fase 5, el formulario de correo es el login real y ya no activa la demo.
 - **No se usa autenticación falsa:** no se crean tokens, correos ni `google_id` inventados. Se retiró el mensaje temporal de prueba/desarrollo del registro («Se requiere un servidor para crear una cuenta real»).
 - `API_BASE_URL`: local (`localhost`/`127.0.0.1`) → `http://localhost:3000`; en despliegue → mismo origen, o `window.SCANGO_API_BASE_URL` si el backend vive en otra URL (sin URL local fija en producción).
 
@@ -366,12 +400,12 @@ python3 -m http.server 8000
 - `#btnDemo`: «Probar demo» → **«Ver demostración»**.
 - Se **eliminó el aviso en línea** `#googleNotice` y su botón `#btnCloseGoogleNotice` (la clase `.hero-notice` de `styles.css` queda sin uso).
 - Se **añadió el modal propio de Scan & Go** `#googleModal` (`.modal-overlay` + `.google-modal-card`) con `#btnCloseGoogleModal` (✕) y `#btnGoogleModalOk` («Entendido»), `role="dialog"`, `aria-modal="true"`, `aria-labelledby="googleModalTitle"`, `aria-describedby="googleModalDesc"`.
-- Texto del acceso de correo: «Acceso con correo (demostración)» → **«Acceso de demostración (no crea cuenta ni guarda tus datos)»**.
+- Texto del acceso de correo: «Acceso con correo (demostración)» → **«Acceso de demostración (no crea cuenta ni guarda tus datos)»** (histórico; desde la Fase 5 el bloque es el login real: «Inicia sesión con tu correo y contraseña»).
 
 **`frontend/app.js`**
 - `handleGoogleAccess()` (aviso en línea con auto-cierre a los 7 s) → **`openGoogleModal()` / `closeGoogleModal()`**: abren/cierran `#googleModal`; cierran con «Entendido», con ✕, con clic en el fondo (overlay) y con **`Escape`**; guardan el disparador en `googleModalTrigger` y **devuelven el foco** al cerrar. El botón «G» sigue **sin** llamar a `POST /api/auth/google`, sin cargar Google Identity Services y sin pedir correo/contraseña/nombre.
-- Nuevas funciones de limpieza invocadas al inicio de `init()`: `limpiarDatosFalsosGoogle()` (borra `scango_google_accounts` y cualquier clave `scango_google_*`) y `limpiarPerfilLocalInventado()` (borra `tottus_user` **sin `id` de backend**). No tocan carrito, historial, pedido ni perfil identificado por DNI.
-- **Acceso por correo:** se **eliminó la fabricación de perfil** (nombre derivado del correo + `localStorage.setItem('tottus_user', …)`); ahora limpia los campos y llama a `enterDemo()`, sin guardar correo, contraseña ni perfil.
+- Nuevas funciones de limpieza invocadas al inicio de `init()`: `limpiarDatosFalsosGoogle()` (borra `scango_google_accounts` y cualquier clave `scango_google_*`) y `limpiarPerfilLocalInventado()` (borra `tottus_user` **sin `id` de backend**). No tocan carrito, historial, pedido ni perfiles con `id` válido.
+- **Acceso por correo (histórico):** en la Etapa 3 se **eliminó la fabricación de perfil** y se llamaba a `enterDemo()`. En la Fase 5 se reemplazó por el login real contra `POST /api/clientes/login`, que guarda la sesión pública y nunca entra a la demo.
 - Mensaje `404` del DNI: «…usa «Probar demo»» → «…usa «Ver demostración»».
 - Comentario del binding de `#btnDemo` actualizado a «Ver demostración».
 
@@ -379,18 +413,19 @@ python3 -m http.server 8000
 - Nuevas reglas `.google-modal-card` y `.google-modal-card .modal-close` (botón de cierre arriba a la derecha con `hover` y `:focus-visible`), con diseño propio; **no** imita la interfaz de Google.
 
 **`frontend/tobi-chat.js`**
-- Respuesta del asistente para demo/cuenta: ahora menciona «Ver demostración» y el ingreso por DNI.
+- Respuesta del asistente para demo/cuenta: menciona «Ver demostración»; desde la Fase 5 invita a crear una cuenta o iniciar sesión con correo y contraseña (ya no menciona el ingreso por DNI).
 
 **Sin cambios en:** `backend/` (Google OAuth intacto), `database/`, configuración de Vercel y Docker (no existen en el repositorio). No se crearon clientes, órdenes ni tokens.
 
-### Validación Etapa 3 (QA, 2026-10-18)
+### Validación Etapa 3 (QA, 2026-10-18) — histórico
+> **Nota de vigencia:** estas pruebas corresponden al login por DNI, retirado de la interfaz en la Fase 5. `POST /api/clientes/dni` sigue disponible en el backend, pero ya no se usa para autenticar. Las pruebas de registro/login por correo quedaron pendientes de ejecución manual.
 Registro de las pruebas ejecutadas sobre el backend + PostgreSQL reales (puerto `3000`, `npm start` → `node src/app.js`). No se crearon clientes ni órdenes y no se eliminaron datos.
 - **Cámara y lector:** **verificados manualmente por el usuario en un dispositivo real**, con el frontend desplegado en Vercel. No fue una comprobación automática.
 - **Backend activo (salud):** `GET /` → `200` (`{"success":true,...}`); `GET /api/products` → `200`.
-- **Login por DNI con backend conectado:** **verificado.** `POST /api/clientes/dni` `{ "dni": "99999999" }` → `200` con `{ id, nombre, dni }` (cliente existente).
+- **Login por DNI (histórico) con backend conectado:** **verificado.** `POST /api/clientes/dni` `{ "dni": "99999999" }` → `200` con `{ id, nombre, dni }` (cliente existente).
 - **DNI inexistente:** **verificado.** `{ "dni": "12345678" }` → `404` (`"El DNI no esta registrado."`).
 - **Formato inválido:** **verificado.** `{ "dni": "abc" }` → `400`; `{}` (sin DNI) → `400`. El frontend no permite continuar ante `404`/`400`.
-- **Seguridad estática del login:** `404`, `!response.ok` y error de red retornan sin entrar; solo se guarda `tottus_user` cuando el backend devuelve un `id` real; el `finally` reactiva el botón y restaura «Ingresar con DNI»; el modo demostración queda separado del DNI; el botón «G» no llama a `/api/auth/google`.
+- **Seguridad estática del login (histórico):** `404`, `!response.ok` y error de red retornaban sin entrar; solo se guardaba `tottus_user` cuando el backend devolvía un `id` real; el `finally` reactivaba el botón y restauraba el texto del acceso; el modo demostración quedaba separado del login por DNI; el botón «G» no llama a `/api/auth/google`.
 - **Backend desconectado:** **verificado** (se detuvo únicamente el proceso Node con Ctrl + C; PostgreSQL permaneció encendido). `POST /api/clientes/dni` falló por **conexión** (`curl` exit 7, sin respuesta HTTP), descartando `200`/`400`/`404`. La UI muestra error de conexión, permanece en el login, **no** crea `tottus_user`, **no** activa el modo demostración y reactiva el botón con su texto original.
 - **Recuperación tras reinicio:** **verificada.** Reiniciado el backend, `GET /` y `POST /api/clientes/dni` `99999999` vuelven a responder `200`, sin recargar el frontend ni modificar la base de datos.
 - **Google OAuth real:** **pospuesto** por falta de `GOOGLE_CLIENT_ID` en el servidor; el botón «G» permanece como aviso «próximamente» y no llama a `POST /api/auth/google`.

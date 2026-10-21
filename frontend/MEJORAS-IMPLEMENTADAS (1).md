@@ -2,7 +2,7 @@
 
 > Documento de trabajo: segunda iteración del proyecto **Tottus Scan & Go** (Universidad Norbert Wiener – Software 1, Proyecto Integrador).
 > Fecha: septiembre 2026 · Equipo: Arzapalo, Alva, Cabrejos, Condori · Ciclo: IS4M1.
-> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–28 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio, revisión final y visibilidad nav/TOBI solo en dashboard). **Sexta iteración (TOBI conversacional, octubre 2026):** secciones 39–50 (saludo animado y saltito, chat aparte, historial, saludo con nombre, alergias, productos frecuentes, recetas con filtro, descuentos del día, comprensión, alerta en catálogo, lista de compras y sugerencias). **Séptima iteración (backend Node/Express/PostgreSQL, octubre 2026):** secciones 53–54 documentan la API REST (modelos, controladores y rutas sobre las tablas de `backend/database/init.sql`) y la corrección de la ruta `/api/products`; §55–§57 la integración del catálogo y la búsqueda por código del frontend con la API. **Cierre del backend (octubre 2026):** §58–§61 documentan el registro de compras con detalles y transacción (`orden_detalle`, `POST /api/ordenes`), la conexión del pago del frontend (botón *Pagar* + protección anti doble pago), el historial desde PostgreSQL con respaldo local y la auditoría final del backend. **Octava iteración (ingreso por DNI + Google «próximamente», octubre 2026):** §62 documenta el ingreso por DNI contra el backend real, la desactivación segura de Google (modal propio, sin OAuth en el frontend), el modo demostración claramente etiquetado y la validación QA de la Etapa 3. **Fase 2A (octubre 2026):** §63 documenta la separación estricta entre modo demo y cliente real en catálogo, búsqueda, pagos e historial, eliminando el fallback al cliente 1. Todo el código se genera solo con **Opencode**.
+> **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–28 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio, revisión final y visibilidad nav/TOBI solo en dashboard). **Sexta iteración (TOBI conversacional, octubre 2026):** secciones 39–50 (saludo animado y saltito, chat aparte, historial, saludo con nombre, alergias, productos frecuentes, recetas con filtro, descuentos del día, comprensión, alerta en catálogo, lista de compras y sugerencias). **Séptima iteración (backend Node/Express/PostgreSQL, octubre 2026):** secciones 53–54 documentan la API REST (modelos, controladores y rutas sobre las tablas de `backend/database/init.sql`) y la corrección de la ruta `/api/products`; §55–§57 la integración del catálogo y la búsqueda por código del frontend con la API. **Cierre del backend (octubre 2026):** §58–§61 documentan el registro de compras con detalles y transacción (`orden_detalle`, `POST /api/ordenes`), la conexión del pago del frontend (botón *Pagar* + protección anti doble pago), el historial desde PostgreSQL con respaldo local y la auditoría final del backend. **Octava iteración (ingreso por DNI + Google «próximamente», octubre 2026):** §62 documenta el ingreso por DNI contra el backend real, la desactivación segura de Google (modal propio, sin OAuth en el frontend), el modo demostración claramente etiquetado y la validación QA de la Etapa 3 (el login por DNI fue retirado en la Fase 5, §64). **Fase 2A (octubre 2026):** §63 documenta la separación estricta entre modo demo y cliente real en catálogo, búsqueda, pagos e historial, eliminando el fallback al cliente 1. **Fase 5 (octubre 2026):** §64 documenta el registro e inicio de sesión reales con correo y contraseña, bcrypt, la migración `password_hash`, la sesión local mínima y el retiro del login por DNI de la interfaz. Todo el código se genera solo con **Opencode**.
 
 Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 
@@ -36,7 +36,7 @@ Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 | 6 | QR seguro para validación en Seguridad (salida) | ✅ | `issueSalidaQR()`, 3:00 min |
 | 7 | Confetis + "¡Felicidades por tu compra!" al finalizar | ✅ | `confettiBurst()` |
 | 8 | Explicación al cliente de la seguridad del QR | ✅ | Notas 🔒 en pantalla + TOBI |
-| 9 | Login mejorado | ✅ | Botón 👁️ ver contraseña + saludo de TOBI |
+| 9 | Login mejorado | ✅ | §64: login real por correo/contraseña (`POST /api/clientes/login`) + toggle 👁️ + saludo de TOBI |
 | 10 | Interfaz más dinámica y atractiva | ✅ | Animaciones, burbuja parlante, confeti |
 | 11 | Saludo animado de Tobi + saltito “ábreme” | ✅ | §39: `.tobi-greet` al abrir + `.tobi-nudge` cada 7 s |
 | 12 | Chat aparte con Tobi, sin límite | ✅ | §40: vista `view-tobi`, typing, scroll, Enter |
@@ -49,6 +49,8 @@ Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 | 19 | Tobi entiende mejor (sin IA) | ✅ | §47: tipeos, sinónimos, seguimiento, 3 botones |
 | 20 | Alerta de alergia en catálogo y carrito | ✅ | §48: tabla 14 productos + modal |
 | 21 | Lista de compras + sugerencias rápidas | ✅ | §49–50: Mi lista (tope 50) + fila de hasta 4 |
+| 22 | Registro real con correo y contraseña | ✅ | §64: `POST /api/clientes/registro` + bcrypt (costo 10) |
+| 23 | Login real y retiro del acceso por DNI | ✅ | §64: `POST /api/clientes/login`; el DNI queda solo como dato de registro |
 
 ---
 
@@ -169,8 +171,10 @@ En producción la firma debe ser **HMAC/JWT del lado del servidor** y la validac
 ## 6. ✨ Login mejorado
 
 - **Botón 👁️ ver/ocultar contraseña** (alterna `type="password"` ↔ `type="text"`).
-- **Saludo de TOBI con el nombre real registrado** apenas inicia sesión.
-- Se conserva el acceso demo de un toque para exposiciones.
+- **Login real:** `#emailLoginForm` normaliza el correo y envía `{ correo, password }` a `${API_BASE_URL}/api/clientes/login`. Solo acepta la sesión con HTTP OK, `success:true` e `id` entero > 0; un 400/401/500 o un error de red muestra un mensaje controlado en `#authStatus` y no entra a la demo.
+- **Registro real:** `#loginForm` envía `{ nombre, dni, correo, password, passwordConfirm, fechaNacimiento }` a `${API_BASE_URL}/api/clientes/registro`; un 201 guarda la sesión pública, limpia los campos e ingresa al dashboard.
+- **Saludo de TOBI con el nombre real registrado** apenas inicia sesión o se crea la cuenta.
+- **Demo separada:** se conserva el acceso demo de un toque, pero solo mediante `#btnDemo` → `enterDemo()`.
 - Textos corregidos: se eliminó "prueba gratis" (confuso) → ahora dice **"modo de prueba"** de la app.
 
 ---
@@ -359,12 +363,14 @@ Ajuste visual para que la interfaz concuerde con `img/Logo_Tottus.png`. Solo col
 | Vista inicial: solo bienvenida + 3 botones (`#btnGoLogin` amarillo, `#btnGoRegister` blanco, `#btnDemo` transparente con borde blanco; `52px`, `gap:12px`, `max-width:380px`); eliminados “Comenzar compra” y tarjeta de beneficios | `index.html`, `.hero-auth`, `.hero-btn-*` |
 | Login (`#loginCard`/`#emailLoginForm`): título + texto corto, email + contraseña con etiquetas, toggle 👁️, enlace visual de recuperación, “Ingresar” verde y “Volver” discreto; errores bajo cada campo; tarjeta blanca `max-width:420px` (`20px` móvil / `24px` escritorio) | `index.html`, `.auth-card`, `.field-error` |
 | Registro (`#loginForm` “Crear cuenta”): campos y validaciones RN02 intactos + botón “Volver” (`#btnBackToWelcomeReg`) | `index.html` |
-| Interacción por JS sin hash ni recargas: cada botón muestra solo su formulario en la misma pantalla con foco al primer campo; “Volver” restaura, devuelve el foco y limpia el hash con `history.replaceState`; demo reutiliza el acceso existente; guardia `window._emailLoginBound` (sin listeners duplicados); contraseña nunca en `localStorage`/consola | `app.js` |
+| Interacción por JS sin hash ni recargas: cada botón muestra solo su formulario en la misma pantalla con foco al primer campo; “Volver” restaura, devuelve el foco y limpia el hash con `history.replaceState`; la demo se activa solo con `#btnDemo`; guardia `window._emailLoginBound` (sin listeners duplicados); contraseña nunca en `localStorage`/consola | `app.js` |
 | Corrección inicial: `.auth-card { display:grid }` vencía a `hidden` → reglas `#loginCard[hidden]` / `#loginForm[hidden] { display:none !important }` | `styles.css` |
 
 ---
 
-## 21. 📝 Formulario “Crear cuenta” con validación por campo (sin backend)
+## 21. 📝 Formulario “Crear cuenta” con validación por campo (validación local; alta real desde §64)
+
+> **Nota de vigencia (§64, Fase 5):** este formulario ya **no** es una simulación. El submit valida localmente y envía `POST /api/clientes/registro`; con 201 guarda la sesión pública y limpia todos los campos. Las filas de “éxito sin backend” describen el estado histórico de esta sección.
 
 Solo acceso/registro. Login (`#loginCard`), demo, catálogo, escáner, carrito, pago, salida y TOBI intactos.
 
@@ -374,8 +380,8 @@ Solo acceso/registro. Login (`#loginCard`), demo, catálogo, escáner, carrito, 
 | Controles: toggle independiente `Contraseña` (`#btnTogglePass`) y `Confirmar` (`#btnTogglePassConfirm`), aviso RN02 +18 existente, `Crear cuenta` (`btn-primary` verde) + `Volver` (`btn-ghost` discreto) + `¿Ya tienes una cuenta? Iniciar sesión` (`#btnGoLoginFromRegister`, `type="button"`, sin hash) | `index.html` |
 | DNI solo números: `inputmode="numeric"`, `maxlength="8"`, `pattern="\d{8}"` + filtro `replace(/\D/g,"").slice(0,8)` en `input` | `index.html`, `app.js` |
 | Helpers `setRegError()` / `clearRegisterErrors()` / `validateRegisterField()` / `validateRegisterAll()`; errores por campo con `aria-invalid`, limpieza al corregir (`input`/`change`), re-chequeo de confirmación al cambiar la original | `app.js` |
-| Submit valida todo, enfoca el primer error, no borra otros campos; éxito solo muestra `Registro de demostración completado. Se requiere un servidor para crear una cuenta real.` en `#registerSuccess` + `toast`, limpia ambas contraseñas y no guarda nada | `app.js` |
-| Seguridad: sin `localStorage`/`sessionStorage`/consola/URL con contraseñas; comentario técnico `registro real requiere servidor + almacenamiento seguro` en el submit | `app.js` |
+| Submit valida todo, enfoca el primer error, no borra otros campos. **Histórico:** el éxito solo mostraba `Registro de demostración completado…` en `#registerSuccess`; desde §64 crea la cuenta real, informa “Cuenta creada correctamente” y limpia todos los campos | `app.js` |
+| Seguridad: sin `localStorage`/`sessionStorage`/consola/URL con contraseñas; desde §64 el perfil público guardado excluye contraseñas, confirmaciones y hashes | `app.js` |
 | Navegación reutiliza `showRegister` / `showEmailLogin` / `showWelcome` + `calcAge`: un solo formulario visible, foco a `loginName`, `Volver` restaura bienvenida + limpia errores/contraseñas + foco a `btnGoRegister` sin recarga ni cambio de URL; guardas `_registerBound` / `_registerToggleBound` / `_emailLoginBound` | `app.js` |
 | Estilo login reutilizado: `.login-card` blanca `max-width:420px`, `gap:16px`, `input min-height:48px`, `.field-error`/`.form-success`/`.auth-switch`, `margin-bottom:32px` para que TOBI/navegación no tapen controles; `overflow-x:hidden` global | `styles.css` |
 
@@ -413,7 +419,7 @@ Sin reconstruir acceso ni añadir funciones/listeners duplicados. Dashboard, pro
 | Unificación: `--muted:#607069`, gaps `12/16px`, radios `12/14/16px`, campos y botones `min-height:48px`, forms `420px`, hero `520px`, `:focus-visible` verde oscuro, `auth-switch` también en login | `styles.css` |
 | Accesibilidad: `aria-expanded/aria-controls` en Iniciar/Crear, `aria-hidden` sincronizado en hero/cards, `aria-live` en 9 errores/confirmación, `label for`, `autocomplete email/current-password/new-password`, `inputmode numeric`, foco a correo/nombre y retorno a su botón, sin autofocus inicial | `index.html`, `app.js` |
 | Enlace faltante `¿No tienes cuenta? Crear cuenta` (`#btnGoRegisterFromLogin → showRegister`); el inverso ya existía; foco y una sola tarjeta por vez conservados | `index.html`, `app.js` |
-| Seguridad re-verificada: sin contraseñas en `localStorage`/`sessionStorage`/consola/URL; registro demo sin cuenta real; demo en memoria sin credenciales | `app.js` |
+| Seguridad re-verificada: sin contraseñas en `localStorage`/`sessionStorage`/consola/URL; desde §64 el registro crea una cuenta real y la demo sigue en memoria sin credenciales | `app.js` |
 
 **Verificación:** `node --check` OK; flujos 1–5 (login, registro, enlaces, demo, recarga sin forms/hash/errores); 320–1366 sin scroll horizontal ni superposición TOBI/navegación.
 
@@ -1098,21 +1104,23 @@ El historial pasó a leerse del servidor (compras reales con sus productos) y, s
 
 ---
 
-## 62. 🆔🔵 Ingreso por DNI + Google «próximamente» (Etapa 3) — revisión de seguridad y QA
+## 62. 🆔🔵 Ingreso por DNI + Google «próximamente» (Etapa 3) — revisión de seguridad y QA (histórico; DNI retirado en §64)
 
-Fase de cierre del acceso: el ingreso por DNI queda **activo contra el backend real**, Google queda **preparado en el backend pero desactivado en el frontend** (sin OAuth y sin selector falso) y la demo queda **claramente etiquetada**. **Sin cambios** en backend, base de datos, Vercel ni Docker.
+Fase de cierre del acceso (histórica): el ingreso por DNI **estuvo activo contra el backend real hasta la Fase 5**, cuando se retiró de la interfaz; Google queda **preparado en el backend pero desactivado en el frontend** (sin OAuth y sin selector falso) y la demo queda **claramente etiquetada**. **Sin cambios** en backend, base de datos, Vercel ni Docker.
+
+> **Nota de vigencia (§64, Fase 5):** el login por DNI ya no existe en la interfaz. El acceso real es por correo y contraseña (`POST /api/clientes/login`) y el alta por `POST /api/clientes/registro`. `POST /api/clientes/dni` se conserva en el backend por compatibilidad, pero no se usa para autenticar. Las filas sobre `#dniLoginForm` / `#btnDniLogin` describen el estado histórico de la Etapa 3.
 
 | Cambio | Dónde |
 |--------|-------|
-| Ingreso por DNI (`#dniLoginForm`): limpia a solo dígitos (máx. 8), valida exactamente 8 (evita solicitudes vacías), deshabilita `#btnDniLogin` + «Verificando…» mientras consulta y lo reactiva al terminar | `index.html`, `app.js` |
-| Consulta real `POST /api/clientes/dni` (`{dni}`, `API_BASE_URL`): **200** identifica (`id`,`nombre`,`dni`); **404** «El DNI no está registrado…»; error de red → mensaje controlado, se queda en el login y **no** crea sesión | `app.js` |
-| `localStorage['tottus_user']` guarda el `id` real del backend; `currentClienteId()` usa ese `id` (o el cliente demo) para historial y registro de compra | `app.js` |
+| Ingreso por DNI (histórico; formulario retirado en §64): limpiaba a solo dígitos (máx. 8), validaba exactamente 8 (evitaba solicitudes vacías), deshabilitaba `#btnDniLogin` + «Verificando…» mientras consultaba y lo reactivaba al terminar | `index.html`, `app.js` |
+| Consulta real `POST /api/clientes/dni` (`{dni}`, `API_BASE_URL`), histórica: **200** identifica (`id`,`nombre`,`dni`); **404** «El DNI no está registrado…»; error de red → mensaje controlado, se queda en el login y **no** crea sesión | `app.js` |
+| `localStorage['tottus_user']` guarda el `id` real del backend; desde §64 lo alimentan registro/login por correo y `currentClienteId()` usa ese `id` para historial y registro de compra | `app.js` |
 | Google «próximamente»: `#btnGoogleAccess` **no** llama a `POST /api/auth/google`, **no** carga Google Identity Services y **no** pide datos; abre un **modal propio de Scan & Go** `#googleModal` (`#btnCloseGoogleModal`, `#btnGoogleModalOk`), cerrable con «Entendido», ✕, clic en el fondo y `Escape`, con `role="dialog"`, `aria-modal` y foco gestionado (devuelve el foco al disparador) | `index.html`, `app.js`, `styles.css` |
 | Eliminado el aviso en línea `#googleNotice` (y `#btnCloseGoogleNotice`) con su `handleGoogleAccess()` y su auto-cierre | `index.html`, `app.js` |
-| Renombres de la demo: `#btnDemo` «Probar demo» → **«Ver demostración»**; `#demoBadge` «Modo demo» → **«Modo demostración»**; texto del acceso por correo → «Acceso de demostración (no crea cuenta ni guarda tus datos)» | `index.html` |
-| Acceso por correo neutralizado: ya **no** fabrica un perfil local ni escribe `tottus_user`; valida y entra a `enterDemo()` sin guardar correo, contraseña ni perfil | `app.js` |
-| Limpieza defensiva al iniciar: `limpiarDatosFalsosGoogle()` (borra `scango_google_accounts` y claves `scango_google_*`) y `limpiarPerfilLocalInventado()` (borra `tottus_user` sin `id` de backend); no tocan carrito, historial, pedido ni perfil por DNI | `app.js` |
-| Mensaje 404 del DNI → «…usa «Ver demostración»»; respuesta de TOBI sobre demo/cuenta ahora menciona «Ver demostración» y el ingreso por DNI | `app.js`, `tobi-chat.js` |
+| Renombres de la demo: `#btnDemo` «Probar demo» → **«Ver demostración»**; `#demoBadge` «Modo demo» → **«Modo demostración»**; texto del acceso por correo → «Acceso de demostración (no crea cuenta ni guarda tus datos)» (histórico; desde §64 ese bloque es el login real) | `index.html` |
+| Acceso por correo (histórico): en la Etapa 3 ya **no** fabricaba un perfil local ni escribía `tottus_user`; validaba y entraba a `enterDemo()`. Desde §64 es el login real y **no** activa demo | `app.js` |
+| Limpieza defensiva al iniciar: `limpiarDatosFalsosGoogle()` (borra `scango_google_accounts` y claves `scango_google_*`) y `limpiarPerfilLocalInventado()` (borra `tottus_user` sin `id` de backend); no tocan carrito, historial, pedido ni perfiles con `id` válido | `app.js` |
+| Mensaje 404 del DNI → «…usa «Ver demostración»» (histórico; el formulario ya no existe); la respuesta de TOBI se actualizó en §64 para invitar a correo/contraseña o a la demo | `app.js`, `tobi-chat.js` |
 | Sin cambios en backend (`POST /api/auth/google` intacto: exige `credential` real), base de datos, Vercel ni Docker | — |
 
 **Verificación (QA real, 2026-10-18):** health `GET /` OK; DNI existente **200** (`Cliente Demo`, dni 99999999), inexistente **404**, formato inválido **400**; con el backend apagado el frontend muestra «No se pudo conectar con el servidor…» y **no** crea sesión; recuperación correcta tras reiniciar el backend; `POST /api/auth/google` sin `credential` → **400** (OAuth real pospuesto por falta de `GOOGLE_CLIENT_ID`); `node --check` OK; cámara/lector verificados manualmente en Vercel.
@@ -1185,3 +1193,68 @@ Rama de trabajo: **`fix-local-api-orders`** (octubre 2026). Objetivo: que el mod
 **Archivos modificados:** `frontend/app.js`, `frontend/sw.js` y este documento. Sin cambios en backend, base de datos, login, registro, Google Auth ni estilos. **Sin commit.**
 
 **Confirmación clave:** un cliente real de PostgreSQL con `id = 1` **ya no se bloquea**. Con `demoMode === false`, `currentClienteId()` devuelve `1` y el pago/historial operan con ese ID real; la demo devuelve `null` por la bandera de modo, nunca por comparar el ID.
+
+---
+
+## 64. 🔐 Fase 5 — Registro e inicio de sesión reales con correo y contraseña
+
+**Rama:** `main` · **Fecha:** 2026-10-21 · **Objetivo:** conectar los formularios existentes con los endpoints reales del backend, conservar una sesión mínima segura, mantener la demo separada y retirar el DNI como mecanismo de login.
+
+**Alcance:** sin JWT, sin cookies, sin `Authorization`, sin sesión de servidor, sin modificar CORS, pagos, órdenes ni el flujo de compra. `POST /api/clientes/dni` se conserva en el backend por compatibilidad.
+
+### 64.1 Backend
+
+| Cambio | Detalle |
+|--------|---------|
+| Dependencia | `bcryptjs ^3.0.3` es la **única** añadida a `backend/package.json` / `package-lock.json`. |
+| Hash | `BCRYPT_ROUNDS = 10`; `bcrypt.hash()` al registrar y `bcrypt.compare()` al iniciar sesión. Nunca se guarda ni se devuelve la contraseña original. |
+| `POST /api/clientes/registro` | Valida nombre (≥3), DNI (8 dígitos), correo (formato), contraseña (≥4), `passwordConfirm` (si viene) y fecha de nacimiento real/no futura. Normaliza `correo` con trim + lowercase, detecta duplicados por correo/DNI (**409**) y responde **201** con `{ success:true, data }`. |
+| `POST /api/clientes/login` | Normaliza el correo y busca por la columna `correo`. Si la cuenta no existe, no tiene contraseña o la clave no coincide → **401** con el mensaje genérico «Correo o contraseña incorrectos.». Éxito → **200** con la misma proyección pública. |
+| Proyección segura | `clienteSesionPublico()` devuelve `id`, `nombre`, `correo`, `dni`, `fechaNacimiento`, `edad` y **`esAdulto`**. `password_hash` no forma parte de `COLUMNAS` ni de la respuesta HTTP. |
+| Modelo | Nuevas funciones `buscarPorCorreo`, `buscarPorCorreoConPassword` (solo uso interno del login) y `crearConPassword` (persiste únicamente el hash). Se conservan `identificarPorDni`, `buscarPorDni`, `crear()` y la ruta `/dni`. |
+| Compatibilidad | Google Auth, catálogo, productos, órdenes, historial y CORS intactos. |
+
+### 64.2 Base de datos
+
+Migración nueva `database/migrations/002-add-password-hash-clientes.sql`:
+
+```sql
+ALTER TABLE public.cliente
+ADD COLUMN IF NOT EXISTS password_hash TEXT;
+```
+
+- Columna **nullable**, sin `DEFAULT`, idempotente por `IF NOT EXISTS`.
+- Sin datos, secretos ni contraseñas.
+- Ya aplicada manualmente en Neon (`neondb`); **no** se reejecuta desde la aplicación ni durante las validaciones.
+
+### 64.3 Frontend
+
+| Cambio | Detalle |
+|--------|---------|
+| Login real | `#emailLoginForm` envía `{ correo, password }` a `${API_BASE_URL}/api/clientes/login`. Correo normalizado (trim + lowercase), validación local, botón deshabilitado con “Iniciando sesión…” y estado en `#authStatus`. |
+| Registro real | `#loginForm` envía `{ nombre, dni, correo, password, passwordConfirm, fechaNacimiento }` a `${API_BASE_URL}/api/clientes/registro`. Mantiene `validateRegisterAll()` y los mensajes por campo; éxito → sesión real; 400/409/red → `#registerError` sin perder los datos útiles. |
+| Sesión local | `guardarSesionCliente()` guarda en `localStorage['tottus_user']` solo `{ id, name, email, dni, birth, age, isAdult }`; exige `id` entero > 0 y no guarda contraseñas, confirmaciones, hashes ni tokens. Aplica a registro y login. |
+| Mapeo de edad | `isAdult` se construye con **`data.esAdulto === true`** (se corrigió el nombre de la propiedad; antes se leía `data.esAdult` y quedaba `false`). |
+| Retiro del login por DNI | Se eliminaron `#dniLoginForm`, `#dniLogin`, `#dniLoginError`, `#btnDniLogin`, el separador `o`, `setDniLoginError()`, `ingresarConDni()` y su listener. El DNI sigue siendo obligatorio en “Crear cuenta” y `#loginDNI` conserva sus validaciones. |
+| Demo separada | `#btnDemo` es la **única** vía de `enterDemo()`. Login, registro y cualquier error (400/401/409/500/red) no activan la demo ni crean una sesión falsa. |
+| Interfaz | Nuevos estados `#authStatus` y `#registerError` con `aria-live`; estilos mínimos `.form-status` (error/éxito). Se reemplazó “Acceso de demostración” por “Inicia sesión con tu correo y contraseña”. |
+| Textos alineados | El modal de Google y la respuesta de TOBI invitan a iniciar sesión con correo/contraseña o a usar “Ver demostración”; ya no ofrecen ingreso por DNI. |
+
+### 64.4 Archivos de la fase
+
+- `backend/package.json`, `backend/package-lock.json`
+- `backend/src/models/clienteModel.js`
+- `backend/src/controllers/clienteController.js`
+- `backend/src/routes/clienteRoutes.js`
+- `frontend/app.js`, `frontend/index.html`, `frontend/styles.css`, `frontend/tobi-chat.js` (texto de ayuda)
+- `database/migrations/002-add-password-hash-clientes.sql` (nuevo)
+- `frontend/DOCUMENTACION-TECNICA (1).md` y este documento
+
+### 64.5 Verificación y pendientes
+
+- `node --check` OK en modelo, controlador, rutas y `frontend/app.js`; `git diff --check` sin errores.
+- Sin `password`, `passwordConfirm` ni `password_hash` en `localStorage`/`sessionStorage` ni en logs.
+- No se ejecutaron POST reales, no se creó ningún cliente y no se ejecutó SQL durante la implementación/revisión.
+- **Pendiente:** prueba manual de registro y login (éxito, 400, 401, 409 y backend caído), en local o producción.
+- Recuperación de contraseña y sesión persistente con token quedan como trabajo futuro.
+- Al cierre de esta documentación, los cambios están **sin commit ni push**.
