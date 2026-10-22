@@ -124,31 +124,40 @@ async function cargarProductosDesdeAPI() {
 // - Modo real: GET a la API; devuelve el producto o un mensaje de error claro.
 // Resultado: { producto, error }; error === null cuando la búsqueda fue válida.
 const busquedasProductoEnCurso = new Map();
-async function buscarProductoPorCodigo(codigo) {
+async function buscarProductoPorCodigo(codigo, perfToken = null) {
   const code = String(codigo == null ? "" : codigo).trim();
   if (!code) return { producto: null, error: "Código de barras vacío." };
   // Modo demo: catálogo local exclusivamente (nunca fetch).
   if (demoMode) {
+    markScanPerfToken(perfToken, "lookupStartAt");
     const local = PRODUCTOS_LOCALES.find((p) => p.code === code) || null;
     if (local && !PRODUCTS.some((p) => p.code === local.code)) PRODUCTS.push(local);
+    markScanPerfToken(perfToken, "lookupEndAt");
     return { producto: local, error: null };
   }
   // Evita solicitudes duplicadas provocadas por la misma lectura rápida.
   if (busquedasProductoEnCurso.has(code)) return busquedasProductoEnCurso.get(code);
   const tarea = (async () => {
     try {
+      markScanPerfToken(perfToken, "fetchStartAt");
       const response = await fetch(`${API_BASE_URL}/api/products/${encodeURIComponent(code)}`);
+      setScanPerfHttpStatus(perfToken, response.status);
+      markScanPerfToken(perfToken, "fetchHeadersAt");
       if (response.status === 404) {
         // Respuesta definitiva: el EAN no está registrado en el catálogo.
         let msg = "";
         try {
           const cuerpo = await response.json();
+          markScanPerfToken(perfToken, "fetchJsonAt");
           if (cuerpo && typeof cuerpo.message === "string") msg = cuerpo.message;
         } catch { /* cuerpo no JSON */ }
+        markScanPerfToken(perfToken, "fetchEndAt");
         return { producto: null, error: msg || `El código EAN ${code} no está registrado.` };
       }
       if (!response.ok) throw new Error("HTTP " + response.status);
       const payload = await response.json();
+      markScanPerfToken(perfToken, "fetchJsonAt");
+      markScanPerfToken(perfToken, "fetchEndAt");
       const item = (payload && payload.success !== false) ? (payload.data || payload) : null;
       const prod = normalizarProductoAPI(item);
       if (!prod) throw new Error("respuesta inválida");
@@ -158,6 +167,7 @@ async function buscarProductoPorCodigo(codigo) {
     } catch (e) {
       // Error de red/CORS o respuesta inválida: NO se afirma que el producto
       // no exista y NO se activa demoMode automáticamente.
+      markScanPerfToken(perfToken, "fetchEndAt");
       console.warn("[modo-real] error de conexión al consultar el catálogo:", e);
       return {
         producto: null,
@@ -850,6 +860,83 @@ let lastConfirmedCode = "";
 let lastConfirmedAt = 0;
 const SCAN_CONFIRM_MS = 1800;
 const SCAN_CONFIRMED_REPEAT_MS = 3000;
+// ---------- INSTRUMENTACIÓN TEMPORAL DE RENDIMIENTO ([scan-perf]) ----------
+// Fase 5C: un solo contexto de medición por ciclo de lectura. Solo memoria y
+// Console; no persiste, no se envía al backend y no cambia el flujo. Los logs
+// no incluyen EAN, producto, identidad ni datos personales.
+let scanPerfCtx = null;
+let scanPerfSeq = 0;
+const scanPerfRound = (ms) => (ms == null ? null : Math.round(ms * 10) / 10);
+function beginScanPerf() {
+  // Un ciclo anterior sin resumen no debe mezclarse con el nuevo.
+  if (scanPerfCtx && !scanPerfCtx.emitted) emitScanPerf({ success: false, errorStage: "scan_restarted" });
+  scanPerfSeq += 1;
+  scanPerfCtx = {
+    scanId: "scan-" + Date.now().toString(36) + "-" + scanPerfSeq,
+    mode: demoMode ? "demo" : "real",
+    openAt: performance.now(),
+    readyAt: null,
+    decodeAt: null,
+    fetchStartAt: null,
+    fetchHeadersAt: null,
+    fetchJsonAt: null,
+    fetchEndAt: null,
+    lookupStartAt: null,
+    lookupEndAt: null,
+    uiStartAt: null,
+    uiEndAt: null,
+    httpStatus: null,
+    pendingUi: false,
+    emitted: false
+  };
+  return scanPerfCtx;
+}
+function markScanPerf(field) {
+  if (!scanPerfCtx || scanPerfCtx.emitted) return;
+  if (scanPerfCtx[field] == null) scanPerfCtx[field] = performance.now();
+}
+// Marcas ligadas al contexto exacto que originó la búsqueda: evita que una
+// lectura manual concurrente contamine el ciclo de cámara en curso.
+function markScanPerfToken(token, field) {
+  if (!token || token !== scanPerfCtx || token.emitted) return;
+  if (token[field] == null) token[field] = performance.now();
+}
+function setScanPerfHttpStatus(token, status) {
+  if (!token || token !== scanPerfCtx || token.emitted) return;
+  token.httpStatus = status;
+}
+function scanPerfReadingActive() {
+  return !!scanPerfCtx && !scanPerfCtx.emitted && scanPerfCtx.decodeAt != null && scanPerfCtx.pendingUi === true;
+}
+function emitScanPerf({ success, errorStage = null } = {}) {
+  if (!scanPerfCtx || scanPerfCtx.emitted) return;
+  const c = scanPerfCtx;
+  c.emitted = true;
+  scanPerfCtx = null;
+  const searchStart = c.fetchStartAt != null ? c.fetchStartAt : c.lookupStartAt;
+  console.log("[scan-perf]", {
+    scanId: c.scanId,
+    mode: c.mode,
+    scanner_open_to_ready_ms: scanPerfRound(c.readyAt != null ? c.readyAt - c.openAt : null),
+    scanner_ready_to_decode_ms: scanPerfRound(c.readyAt != null && c.decodeAt != null ? c.decodeAt - c.readyAt : null),
+    ean_decode_to_fetch_ms: scanPerfRound(c.decodeAt != null && searchStart != null ? searchStart - c.decodeAt : null),
+    product_fetch_headers_ms: scanPerfRound(c.fetchStartAt != null && c.fetchHeadersAt != null ? c.fetchHeadersAt - c.fetchStartAt : null),
+    product_fetch_json_ms: scanPerfRound(c.fetchHeadersAt != null && c.fetchJsonAt != null ? c.fetchJsonAt - c.fetchHeadersAt : null),
+    product_fetch_duration_ms: scanPerfRound(c.fetchStartAt != null && c.fetchEndAt != null ? c.fetchEndAt - c.fetchStartAt : null),
+    product_lookup_duration_ms: scanPerfRound(c.lookupStartAt != null && c.lookupEndAt != null ? c.lookupEndAt - c.lookupStartAt : null),
+    response_to_ui_ms: scanPerfRound(c.uiStartAt != null && c.uiEndAt != null ? c.uiEndAt - c.uiStartAt : null),
+    total_from_camera_ready_ms: scanPerfRound(c.readyAt != null && c.uiEndAt != null ? c.uiEndAt - c.readyAt : null),
+    total_from_open_ms: scanPerfRound(c.uiEndAt != null ? c.uiEndAt - c.openAt : null),
+    httpStatus: c.httpStatus,
+    success: !!success,
+    errorStage: errorStage || null,
+    timestamp: new Date().toISOString()
+  });
+}
+function abortScanPerf(errorStage) {
+  if (!scanPerfCtx || scanPerfCtx.emitted) return;
+  emitScanPerf({ success: false, errorStage });
+}
 function isScannerLibAvailable() {
   if (window.__quaggaCdnFailed) return false;
   return typeof window.Quagga !== "undefined" && !!window.Quagga;
@@ -1030,6 +1117,8 @@ function onScanSuccess(decodedText, decodedResult) {
   lastConfirmedCode = code;
   lastConfirmedAt = now;
   resetScanCandidate();
+  markScanPerf("decodeAt");
+  if (scanPerfCtx) scanPerfCtx.pendingUi = true;
   scanProcessing = true;
   const wasRunning = !!window._quaggaRunning;
   if (statusEl) statusEl.textContent = SCANNER_DETECTED_MSG;
@@ -1089,6 +1178,7 @@ function onScanFailure(error) {
 
 async function startCamera() {
   if (scannerRunning || scannerInitializing || window._quaggaRunning) return;
+  beginScanPerf();
   const statusEl = $("scannerStatus");
   const btnStart = $("btnStartCamera");
   try {
@@ -1096,6 +1186,7 @@ async function startCamera() {
     if (!isScannerLibAvailable()) {
       updateScannerAvailability();
       toast(SCANNER_EXTERNAL_MSG);
+      abortScanPerf("scanner_library_unavailable");
       return;
     }
     // Diagnóstico previo: solo lectura de propiedades (contexto seguro,
@@ -1107,6 +1198,7 @@ async function startCamera() {
       scannerInitializing = false;
       if (statusEl) statusEl.textContent = SCANNER_HTTPS_MSG;
       toast("⚠️ Usa HTTPS o el ingreso manual");
+      abortScanPerf("insecure_context");
       return;
     }
     // Navegador sin soporte de cámara: mensaje propio, sin intentar el lector.
@@ -1115,6 +1207,7 @@ async function startCamera() {
       scannerInitializing = false;
       if (statusEl) statusEl.textContent = SCANNER_NO_CAMERA_MSG;
       toast("⚠️ Cámara no disponible, usa código manual");
+      abortScanPerf("camera_not_supported");
       return;
     }
     // Una sola instancia Quagga2 en #reader. Permiso solo aquí, sin auto-apertura.
@@ -1144,6 +1237,7 @@ async function startCamera() {
         if (btnStart && isScannerLibAvailable()) btnStart.disabled = false;
         else if (btnStart) updateScannerAvailability();
         toast("⚠️ Cámara no disponible, usa código manual");
+        abortScanPerf("camera_init");
         return;
       }
       try {
@@ -1158,6 +1252,7 @@ async function startCamera() {
         }
         if (btnStart && isScannerLibAvailable()) btnStart.disabled = false;
         toast("⚠️ Cámara no disponible, usa código manual");
+        abortScanPerf("camera_start");
         return;
       }
       // Medición real: inicia cuando el lector quedó preparado (tras start).
@@ -1165,6 +1260,7 @@ async function startCamera() {
       scannerRunning = true;
       scannerInitializing = false;
       scanT0 = performance.now();
+      markScanPerf("readyAt");
       if (statusEl) statusEl.textContent = SCANNER_STARTED_MSG;
       setScannerVisual(true);
       if (btnStart) btnStart.disabled = true;
@@ -1195,10 +1291,12 @@ async function startCamera() {
       statusEl.textContent = SCANNER_UNAVAILABLE_MSG;
     }
     toast("⚠️ Cámara no disponible, usa código manual");
+    abortScanPerf("camera_open_exception");
   }
 }
 
 async function stopCamera() {
+  abortScanPerf("camera_stopped");
   try {
     if (window.Quagga && window._quaggaRunning) {
       try { window.Quagga.stop(); } catch { /* ya detenida */ }
@@ -1259,6 +1357,7 @@ async function onScannedCode(rawCode) {
     mostrarEstadoLector(SCANNER_UNSTABLE_MSG);
     beep(false);
     scanT0 = 0;
+    if (scanPerfReadingActive()) abortScanPerf("invalid_code");
     return;
   }
   if (isFastLimitReached(1)) {
@@ -1266,17 +1365,29 @@ async function onScannedCode(rawCode) {
     showFastLimitModal();
     beep(false);
     scanT0 = 0;
+    if (scanPerfReadingActive()) abortScanPerf("fast_limit");
     return;
   }
   // Tiempo real de detección con meta menor de 3 segundos, sin simulación.
   const dt = scanT0 ? ((performance.now() - scanT0) / 1000) : 0;
   const perf = dt ? ` <span class="perf-hint">⏱️ ${dt.toFixed(1)}s (meta &lt;3s ${dt < 3 ? "✅" : "⚠️"})</span>` : "";
-  const { producto: prod, error } = await buscarProductoPorCodigo(code);
+  const perfToken = scanPerfReadingActive() ? scanPerfCtx : null;
+  if (perfToken) perfToken.pendingUi = false;
+  const { producto: prod, error } = await buscarProductoPorCodigo(code, perfToken);
+  const perfReading = !!perfToken && perfToken === scanPerfCtx && !perfToken.emitted;
+  if (perfReading) markScanPerf("uiStartAt");
   if (!prod) {
     // 404: EAN no registrado. Error de red: no se afirma que no exista.
     mostrarEstadoLector(error || (SCANNER_UNKNOWN_MSG + " " + String(code).trim()), true);
     beep(false);
     scanT0 = 0;
+    if (perfReading) {
+      markScanPerf("uiEndAt");
+      const stage = (scanPerfCtx && scanPerfCtx.mode === "demo")
+        ? "product_lookup"
+        : ((scanPerfCtx && scanPerfCtx.httpStatus === 404) ? "product_not_found" : "product_fetch");
+      abortScanPerf(stage);
+    }
     return;
   }
   estadoLectorBloqueadoHasta = 0;
@@ -1287,6 +1398,10 @@ async function onScannedCode(rawCode) {
   beep(ok);
   if (ok) resultEl.innerHTML = SCANNER_ADDED_MSG + " " + prod.name.replace(/</g, "&lt;") + perf;
   scanT0 = 0;
+  if (perfReading) {
+    markScanPerf("uiEndAt");
+    emitScanPerf({ success: ok, errorStage: ok ? null : "add_to_cart" });
+  }
 }
 
 // El botón solo puede borrar el historial simulado de demo. El historial real
