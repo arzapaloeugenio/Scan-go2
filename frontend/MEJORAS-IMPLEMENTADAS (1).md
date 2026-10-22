@@ -4,6 +4,8 @@
 > Fecha: septiembre 2026 · Equipo: Arzapalo, Alva, Cabrejos, Condori · Ciclo: IS4M1.
 > **Tercera iteración (octubre 2026):** secciones 10–13 documentan los cambios posteriores (tope 40 + modal, posición TOBI, logo oficial, imágenes reales). **Cuarta iteración (paleta logo):** sección 15 documenta el ajuste visual a los colores del logotipo. **Quinta iteración (acceso + responsive + revisión):** secciones 24–28 (acceso uniforme, bienvenida con 3 botones, dashboard móvil/escritorio, revisión final y visibilidad nav/TOBI solo en dashboard). **Sexta iteración (TOBI conversacional, octubre 2026):** secciones 39–50 (saludo animado y saltito, chat aparte, historial, saludo con nombre, alergias, productos frecuentes, recetas con filtro, descuentos del día, comprensión, alerta en catálogo, lista de compras y sugerencias). **Séptima iteración (backend Node/Express/PostgreSQL, octubre 2026):** secciones 53–54 documentan la API REST (modelos, controladores y rutas sobre las tablas de `backend/database/init.sql`) y la corrección de la ruta `/api/products`; §55–§57 la integración del catálogo y la búsqueda por código del frontend con la API. **Cierre del backend (octubre 2026):** §58–§61 documentan el registro de compras con detalles y transacción (`orden_detalle`, `POST /api/ordenes`), la conexión del pago del frontend (botón *Pagar* + protección anti doble pago), el historial desde PostgreSQL con respaldo local y la auditoría final del backend. **Octava iteración (ingreso por DNI + Google «próximamente», octubre 2026):** §62 documenta el ingreso por DNI contra el backend real, la desactivación segura de Google (modal propio, sin OAuth en el frontend), el modo demostración claramente etiquetado y la validación QA de la Etapa 3 (el login por DNI fue retirado en la Fase 5, §64). **Fase 2A (octubre 2026):** §63 documenta la separación estricta entre modo demo y cliente real en catálogo, búsqueda, pagos e historial, eliminando el fallback al cliente 1. **Fase 5 (octubre 2026):** §64 documenta el registro e inicio de sesión reales con correo y contraseña, bcrypt, la migración `password_hash`, la sesión local mínima y el retiro del login por DNI de la interfaz. Todo el código se genera solo con **Opencode**. **Diagnóstico Fase 5 (octubre 2026):** §65 documenta la verificación estática de registro/login, la consulta agregada segura para Neon y el estado de Git, sin cambios de código ni de datos.
 
+> **Fase 6 — documentación (2026-10-22):** §66–§70 registran los cambios que no figuraban en este documento: soporte dual PostgreSQL local/Neon y `/api/health` (`f50ecf8`), conexión Vercel → Render (`cdaf28b`), aislamiento por cliente de carrito, orden, boleta e historial en memoria (`e041871`), corrección del borrado del historial demo (`ced9665`) e instrumentación temporal de rendimiento `[scan-perf]` (`5be1b76`). No se modificó código de la aplicación al documentarlos.
+
 Esta carpeta `Scan-Go` contiene la versión final mejorada del proyecto:
 
 | Archivo | Descripción |
@@ -1153,6 +1155,8 @@ Rama de trabajo: **`fix-local-api-orders`** (octubre 2026). Objetivo: que el mod
 | `getDemoHistory()` / `saveDemoHistoryEntry()` | Lectura/escritura exclusiva de `tottus_demo_history` (máx. 20 entradas). |
 | `validateSalida()` | En demo no escribe en `tottus_history` (la orden simulada ya está en `tottus_demo_history`). |
 
+> **Nota de vigencia (2026-10-22):** el aislamiento de esta sección se amplió en **§68** (`e041871`): el carrito y la orden ya no usan claves globales, sino `tottus_cart_demo` / `tottus_cart_real_<id>` y `tottus_order_demo` / `tottus_order_real_<id>`. Las referencias de §63 a claves globales describen el estado de ese momento.
+
 ### 63.2 Cambios en `frontend/sw.js`
 
 | Cambio | Detalle |
@@ -1355,3 +1359,209 @@ No se consultó ni mostró `DATABASE_URL` ni ninguna variable secreta.
 - No se hizo commit ni push.
 - No se implementó recuperación de contraseña ni se inició la Fase 6.
 - La única modificación de esta revisión es **este documento** (§64.3, §64.4, §64.5, §64.6 y §65), a pedido explícito.
+
+---
+
+## 66. 🗄️ Soporte dual PostgreSQL local/Neon y `GET /api/health` (`f50ecf8`)
+
+**Commit:** `f50ecf8` — `feat(backend): soporte dual PostgreSQL local/Neon y endpoint /api/health` · **Fecha:** 2026-10-20 · **Archivos:** `backend/config/db.js`, `backend/src/app.js`, `backend/.env.example`.
+
+**Objetivo:** que el mismo backend funcione con PostgreSQL local o con una base en la nube (Neon/Render) sin cambiar código, y exponer un *health check* que compruebe la conexión sin revelar credenciales.
+
+### 66.1 Selección del modo de conexión (`backend/config/db.js`)
+
+| Condición | Configuración del `Pool` | Variables `DB_*` |
+|---|---|---|
+| `DATABASE_URL` tiene valor | `{ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } }` | Se ignoran |
+| `DATABASE_URL` vacío o ausente | `{ user, password, host, port, database }` desde `DB_*` | Obligatorias; error si falta alguna |
+
+- En modo local se valida además que `DB_PORT` sea numérico (`Number.parseInt`); si no, lanza error.
+- El log de arranque ya no imprime usuario/host/base: solo `[db] Pool configurado en modo nube (DATABASE_URL)` o `[db] Pool configurado en modo local (DB_*)`.
+- `backend/.env.example` añade `NODE_ENV`, deja `DATABASE_URL=` vacío (modo local), reemplaza las credenciales por `CAMBIAR` y documenta que, si `DATABASE_URL` existe, se usa con SSL y se ignoran las `DB_*`.
+- `ssl.rejectUnauthorized: false` es la configuración habitual para Neon/Render; **no valida el certificado del servidor**. Es una decisión de despliegue, no un cambio de esquema.
+
+### 66.2 `GET /api/health` (`backend/src/app.js`)
+
+- Ruta pública registrada antes del manejador 404.
+- Ejecuta `SELECT NOW()` contra el `Pool`.
+- Éxito → **200** `{ success: true, service: "scan-go2-backend", database: "connected" }`.
+- Fallo → **503** `{ success: false, service: "scan-go2-backend", database: "disconnected" }`.
+- No devuelve `err.message`, host, usuario ni cadena de conexión.
+
+**Alcance:** no cambia rutas de negocio, modelos, esquema SQL ni CORS. La ruta es pública y ejecuta una consulta trivial; sirve para verificar el despliegue, no como mecanismo de autenticación.
+
+**Verificación:** revisión estática del commit y `node --check` de los archivos backend al documentar. **No se abrió conexión a Neon ni a PostgreSQL local, no se ejecutó SQL y no se hizo ninguna petición HTTP.**
+
+---
+
+## 67. 🌐 Conexión del frontend en Vercel con el backend en Render (`cdaf28b`)
+
+**Commit:** `cdaf28b` — `feat(frontend): conectar Vercel con backend de Render` · **Fecha:** 2026-10-20 · **Archivo:** `frontend/index.html`.
+
+**Cambio:** se añadió un script inline **antes** de `app.js`:
+
+```html
+<script>
+  if (location.hostname && location.hostname !== "localhost" && location.hostname !== "127.0.0.1" && location.hostname !== "::1") {
+    window.SCANGO_API_BASE_URL = "https://scan-go2-backend.onrender.com";
+  }
+</script>
+```
+
+**Precedencia efectiva en `app.js`:**
+
+1. Si existe `window.SCANGO_API_BASE_URL`, se usa tal cual.
+2. Si el host es `localhost`, `127.0.0.1` o `::1`, se usa `http://localhost:3000`.
+3. En cualquier otro host sin override, `API_BASE_URL = ""` (mismo origen).
+
+**Consecuencias:**
+
+- Cualquier despliegue no local —producción de Vercel, *previews*, dominio propio o una IP de LAN— apunta al backend público de Render, no al mismo origen.
+- La URL de Render queda **fija en el HTML**; no hay separación por entorno (staging/producción) ni posibilidad de cambiarla sin editar `index.html`. Para un cambio de backend habría que modificar y volver a desplegar el frontend.
+- El CORS del backend debe incluir el origen exacto de Vercel; este commit **no** modificó `backend/` ni la lista blanca de orígenes.
+- En `file://` el `hostname` es vacío: no se aplica el override y las peticiones relativas no tienen backend; el modo demo sigue funcionando sin API.
+
+**Archivos:** `frontend/index.html` únicamente. Sin cambios en `app.js`, backend, base de datos ni configuración de Vercel.
+
+**Verificación:** revisión estática del commit y `node --check frontend/app.js` al documentar. No se desplegó ni se hizo ninguna petición a Render.
+
+---
+
+## 68. 🧩 Aislamiento por cliente de carrito, orden y boleta (`e041871`)
+
+**Commit:** `e041871` — `fix(frontend): aislar datos entre demo y usuario real` · **Fecha:** 2026-10-21 · **Archivos:** `frontend/app.js`, `frontend/tobi-history.js`.
+
+**Objetivo:** que demo y cliente real no compartan carrito, orden, boleta, historial en memoria ni mensajes de identidad. La separación anterior (§63) distinguía el catálogo, el pago y el historial remoto, pero seguía usando claves globales `tottus_cart` y `tottus_order`, y el cierre de sesión no recargaba el contexto.
+
+### 68.1 Claves de almacenamiento (nuevas)
+
+| Clave | Escritura / lectura | Ámbito |
+|---|---|---|
+| `tottus_cart_demo` | `claveCarritoActual()` → `loadState()` / `saveState()` | Demo |
+| `tottus_cart_real_<id>` | `claveCarritoActual()` con `currentClienteId()` | Un cliente real por `id` |
+| `tottus_order_demo` | `claveOrdenActual()` → `saveOrder()` / `loadOrder()` / `clearOrder()` | Demo |
+| `tottus_order_real_<id>` | `claveOrdenActual()` con `currentClienteId()` | Un cliente real por `id` |
+
+- Las claves antiguas **`tottus_cart`** y **`tottus_order`** **se conservan intactas**: no se borran ni se migran, porque no es posible determinar a qué modo o cliente pertenecían (comentarios en `app.js`).
+- Sin contexto activo (real sin sesión), `claveCarritoActual()` y `claveOrdenActual()` devuelven `null`: `loadState()` deja `cart = {}`, `saveState()` devuelve `false` y no se escribe ningún carrito compartido.
+
+### 68.2 Cambios en `frontend/app.js`
+
+| Cambio | Detalle |
+|--------|---------|
+| `claveOrdenActual()` / `claveCarritoActual()` | Devuelven la clave demo o `..._real_<id>`; `null` si no hay identidad real. |
+| `saveOrder` / `loadOrder` / `clearOrder` | Operan solo sobre la clave del contexto activo; `clearOrder()` no toca storage si no hay clave. |
+| `loadState` / `saveState` | Carrito aislado por modo/cliente; `saveState()` sigue bloqueando el artículo 41 (`MAX_ITEMS`). |
+| `limpiarBoletaVisible()` | Oculta `#ticketCard` y `#payStep4`, y vacía `#ticketBody` / `#finalTicketBody` al cambiar de contexto. Evita que una boleta demo quede a la vista en modo real o al revés. |
+| `historialSolicitud` / `historialClienteId` + `limpiarHistorialRemoto()` | Invalidan respuestas en vuelo y borran el historial de otra sesión. `cargarHistorialRemoto()` solo evita duplicar la carga del **mismo** cliente; un cliente distinto invalida la solicitud anterior. |
+| `identidadActiva()` | Fuente única de identidad visible. En demo devuelve `{ id:null, name:"Cliente demo", demo:true, isAdult:true }` **sin leer** `tottus_user`; en real exige `id` entero > 0. Se expone como `window.scanGoIdentidadActiva`. |
+| `updateAuthUI()` | Prioridad absoluta a `demoMode`; el botón de salida muestra «Salir de demo» o «Salir» según el contexto. |
+| `enterDemo()` | Carga las claves exclusivas de demo, limpia historial remoto y boleta visible y vuelve a renderizar; no toca `tottus_user` ni las claves reales. |
+| `firstName()`, `buildPreTicket()`, `validateSalida()` | Usan `identidadActiva()`; en demo nunca pintan nombre, correo ni DNI reales. |
+| `checkout()` y boleta final | La pre-boleta y el ticket final distinguen «BOLETA DEMO (SUNAT)» / «RUC demo» de «BOLETA (SUNAT)» / «RUC 20100123456», y «SALIDA AUTORIZADA (DEMO)». |
+| Registro y login | Tras guardar la sesión: `loadState()`, `loadOrder()`, `limpiarHistorialRemoto()`, `limpiarBoletaVisible()`, `updateAuthUI()`, `renderAll()` y `cargarHistorialRemoto()`. |
+| Cierre de sesión | Distingue salir de demo de cerrar sesión real: guarda carrito/orden del contexto, y solo en real elimina `tottus_user`. Después recarga el contexto, limpia historial/boleta, actualiza la UI y avisa «Saliste del modo demo…» o «Sesión cerrada». |
+| `init()` | Solo retoma la orden pendiente si `!demoMode` e `identidadActiva()` existe. |
+
+### 68.3 Cambios en `frontend/tobi-history.js`
+
+- `getUserName()` ya **no** lee `localStorage['tottus_user']` directamente: usa `window.scanGoIdentidadActiva()`.
+- En demo devuelve «Cliente demo» sin consultar el perfil real; en modo real devuelve el primer nombre del perfil autenticado.
+- El resto de `tobi-history.js` no cambió en este commit.
+
+### 68.4 Comportamiento resultante
+
+| Flujo | Demo | Real sin sesión | Real con sesión |
+|---|---|---|---|
+| Carrito | `tottus_cart_demo` | No se persiste (`saveState() === false`) | `tottus_cart_real_<id>` |
+| Orden / boleta | `tottus_order_demo` | Sin clave (`order = null`) | `tottus_order_real_<id>` |
+| Historial visible | `tottus_demo_history` | «Inicia sesión para ver tu historial…» | `GET /api/historial/cliente/:id` |
+| Identidad | «Cliente demo», sin `tottus_user` | `null` | Perfil de `tottus_user` |
+| Salir | Vuelve a la sesión real si estaba pausada | — | Elimina `tottus_user` y vuelve al acceso |
+
+**Verificación:** `node --check frontend/app.js` y `node --check frontend/tobi-history.js` OK; `git diff --check` sin errores. No se ejecutaron compras ni se crearon datos.
+
+**Observación (no forma parte del commit):** `frontend/sw.js` permaneció en `tottus-scan-go-v12`; al no cambiar el SW, un navegador con la versión anterior instalada podría seguir sirviendo el `app.js` cacheado hasta que se actualice la versión del caché. Conviene revisarlo antes de una publicación que dependa de estos cambios.
+
+---
+
+## 69. 🗑️ Corrección del borrado del historial demo (`ced9665`)
+
+**Commit:** `ced9665` — `fix(history): corregir borrado del historial demo` · **Fecha:** 2026-10-21 · **Archivo:** `frontend/app.js`.
+
+**Problema corregido:** el botón «Borrar historial» eliminaba la clave **`tottus_history`** (historial real/local legado) y no borraba **`tottus_demo_history`**. En demo, el historial simulado reaparecía igual; en modo real se simulaba un borrado que el servidor no había hecho y que volvería al recargar.
+
+**Cambios:**
+
+| Elemento | Detalle |
+|---|---|
+| `actualizarBotonBorrarHistorial()` | Nueva función. En demo habilita el botón con «Borrar historial»; en real lo deshabilita y muestra «El historial real no puede eliminarse desde esta versión», con `title` explicativo. |
+| `renderHistory()` | Llama a `actualizarBotonBorrarHistorial()` en cada render. |
+| Listener de `#btnClearHistory` | Si `!demoMode`, retorna sin tocar storage. En demo elimina **solo** `DEMO_HISTORY_KEY` (`tottus_demo_history`), vuelve a renderizar y muestra «Historial demo borrado». |
+
+**Motivo de diseño:** el historial real se deriva de órdenes persistidas en PostgreSQL y no existe un endpoint `DELETE`; borrar solo la copia local sería engañoso porque reaparecería al recargar.
+
+| Modo | Botón | Acción |
+|---|---|---|
+| Demo | Habilitado, «Borrar historial» | Borra `tottus_demo_history` |
+| Real con sesión | Deshabilitado, mensaje honesto | No borra nada |
+| Real sin sesión | Deshabilitado (además, el historial pide login) | No borra nada |
+
+**Verificación:** `node --check frontend/app.js` OK; `git diff --check` sin errores. No se borraron datos reales durante la revisión.
+
+---
+
+## 70. ⏱️ Instrumentación temporal de rendimiento del lector (`5be1b76`)
+
+**Commit:** `5be1b76` — `chore(frontend): instrumentar rendimiento del lector` · **Fecha:** 2026-10-21 · **Archivo:** `frontend/app.js`.
+
+**Naturaleza:** instrumentación **temporal** de la Fase 5C para medir el ciclo completo de una lectura. **No cambia el flujo funcional**: solo memoria y `console.log`; no persiste, no envía datos al backend y no incluye EAN, producto, identidad ni datos personales.
+
+### 70.1 Contexto de medición
+
+`beginScanPerf()` crea **un solo contexto por ciclo** (`scanPerfCtx`) con:
+
+```js
+{
+  scanId, mode, openAt, readyAt, decodeAt,
+  fetchStartAt, fetchHeadersAt, fetchJsonAt, fetchEndAt,
+  lookupStartAt, lookupEndAt, uiStartAt, uiEndAt,
+  httpStatus, pendingUi, emitted
+}
+```
+
+- `scanId = "scan-" + base36(Date.now()) + "-" + secuencia`.
+- `mode` = `"demo"` o `"real"`.
+- Si un ciclo anterior no se emitió, se cierra antes como `errorStage: "scan_restarted"` para no mezclar mediciones.
+
+### 70.2 Funciones añadidas
+
+| Función | Rol |
+|---|---|
+| `beginScanPerf()` | Abre el contexto al iniciar la cámara. |
+| `markScanPerf(field)` | Marca la primera vez un hito del contexto global. |
+| `markScanPerfToken(token, field)` | Marca solo si `token === scanPerfCtx`; evita que una lectura manual concurrente contamine el ciclo de cámara. |
+| `setScanPerfHttpStatus(token, status)` | Guarda el HTTP real del `fetch` del producto. |
+| `scanPerfReadingActive()` | Indica si hay un ciclo con `decodeAt` y `pendingUi`. |
+| `emitScanPerf({ success, errorStage })` | Imprime `console.log("[scan-perf]", {...})` una sola vez y cierra el contexto. |
+| `abortScanPerf(errorStage)` | Emite un ciclo fallido con la etapa correspondiente. |
+
+### 70.3 Puntos de integración
+
+- `buscarProductoPorCodigo(codigo, perfToken)` mide `lookupStartAt/lookupEndAt` en demo y `fetchStartAt` → `fetchHeadersAt` → `fetchJsonAt` → `fetchEndAt` en real, además del `httpStatus`.
+- `startCamera()` abre el contexto y marca `readyAt` tras `Quagga.start()`.
+- `onScanSuccess()` marca `decodeAt` y `pendingUi = true`.
+- `onScannedCode()` marca `uiStartAt` / `uiEndAt` y emite éxito o aborta con `invalid_code`, `fast_limit`, `product_lookup`, `product_not_found`, `product_fetch` o `add_to_cart`.
+- `stopCamera()` aborta con `camera_stopped`; `startCamera()` también registra `scanner_library_unavailable`, `insecure_context`, `camera_not_supported`, `camera_init`, `camera_start` y `camera_open_exception`.
+
+### 70.4 Métricas emitidas
+
+`scanner_open_to_ready_ms`, `scanner_ready_to_decode_ms`, `ean_decode_to_fetch_ms`, `product_fetch_headers_ms`, `product_fetch_json_ms`, `product_fetch_duration_ms`, `product_lookup_duration_ms`, `response_to_ui_ms`, `total_from_camera_ready_ms`, `total_from_open_ms`, `httpStatus`, `success`, `errorStage`, `timestamp`.
+
+Los valores se redondean a 0,1 ms con `scanPerfRound()`; los hitos no alcanzados se emiten como `null`.
+
+### 70.5 Retirada
+
+Es instrumentación **temporal**. Debe retirarse solo después de terminar todas las pruebas (Fase 6D), eliminando las siete funciones, sus llamadas y el bloque de comentarios, sin alterar el comportamiento del lector. Hasta entonces **no debe modificarse ni eliminarse**.
+
+**Verificación:** `node --check frontend/app.js` OK; `git diff --check` sin errores. No se ejecutaron lecturas reales ni se enviaron datos a ningún servicio.

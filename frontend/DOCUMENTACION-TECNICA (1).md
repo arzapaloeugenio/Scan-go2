@@ -7,6 +7,8 @@
 - **Paleta:** verde + blanco + amarillo suave (`--green: #40a629`, `--green-deep: #01855d`, `--yellow: #feeb15`, fondo `#f5f7f4`). `index.html` + `styles.css` se mantienen como base, solo se extiende.
 - **Extras UX:** TOBI (robot guía con burbuja parlante + saludo animado), chat propio con Tobi (respuestas por reglas, sin IA), confeti al finalizar la compra, login con ver/ocultar contraseña + DNI/edad (RN02).
 
+> **Nota de vigencia (2026-10-22):** el carrito, la orden/boleta y el historial local ya **no** usan las claves globales `tottus_cart`, `tottus_order` ni `tottus_history`. Desde `e041871` se usan `tottus_cart_demo` / `tottus_cart_real_<id>`, `tottus_order_demo` / `tottus_order_real_<id>` y `tottus_demo_history`; las claves globales antiguas se conservan intactas sin migrar. Las referencias históricas de §2, §3, §4.4, §4.4d, §5 y §8 se mantienen como registro, pero el comportamiento vigente está en **§4.9**, **§4.3e** y en el historial de cambios «Aislamiento demo ↔ cliente real» (2026-10-21).
+
 ---
 
 ## 1. Objetivos
@@ -21,8 +23,8 @@
 | O5 | Catálogo con descuentos visibles | ✅ 14 productos, etiquetas `-%`, badge `+18`, filtro Ofertas, buscador |
 | O6 | Pago desde el celular (meta ≤60s) | ✅ simulado (Yape / Plin / Tarjeta con form demo) + cronómetro `payT0` |
 | O11 | RN02 bloqueo licores <18 | ✅ `restricted:true` + toast 🔞 + `(menor 🔞)` en header |
-| O12 | RNF02 scan <3s visible + order persistente | ✅ `scanT0` en `scanResult` + `tottus_order` con `restoreOrderUI()` |
-| O13 | Ticket imprimible + historial + beep | ✅ `window.print()` + `tottus_history` (20) + WebAudio 880/220Hz |
+| O12 | RNF02 scan <3s visible + order persistente | ✅ `scanT0` en `scanResult` + `tottus_order_demo` / `tottus_order_real_<id>` con `restoreOrderUI()` |
+| O13 | Ticket imprimible + historial + beep | ✅ `window.print()` + historial remoto por cliente / `tottus_demo_history` (20) + WebAudio 880/220Hz |
 | O14 | PWA mínima offline | ✅ `manifest.json` + `sw.js` (cache html/css/js) |
 | O7 | Confirmación en Caja + confirmación de salida con Seguridad | ✅ doble validación |
 | O8 | QR con tiempo límite anti-hackeo | ✅ 5:00 caja + 3:00 salida, un solo uso |
@@ -45,9 +47,9 @@
 ```
 ┌─────────────┐     eventos DOM      ┌──────────┐    localStorage   ┌──────────────┐
 │ index.html  │ ◄──────────────────► │ app.js   │ ◄───────────────► │ tottus_user  │
-│ (6 vistas)  │                      │ (lógica) │                   │ tottus_cart  │
-└──────┬──────┘                      └──────────┘                   │ tottus_order │
-       │ CSS verde/blanco + animaciones        ▲ cámara + QR        │ tottus_history│
+│ (6 vistas)  │                      │ (lógica) │                   │ tottus_cart_* │
+└──────┬──────┘                      └──────────┘                   │ tottus_order_*│
+       │ CSS verde/blanco + animaciones        ▲ cámara + QR        │ tottus_*history│
        ▼                                       │                   └──────────────┘
 ┌─────────────┐   Quagga2 (CDN)  ┌───────────────────┐   qrcode@1.5.3 (CDN)
 │ styles.css  │   onDetected ──►│ #reader + #scanner │ ◄── con fallback offline
@@ -71,14 +73,14 @@ tobi-profile.js → tobi-history.js → tobi-chat.js
 |---------|-----|-----------------|
 | `index.html` | Estructura + 6 vistas + nav inferior | header, search-bar, `#view-login/home/scanner/cart/checkout/tobi`, `#reader`, `#scannerStatus`, `#btnStartCamera/#btnStopCamera`, `#manualCode/#btnManualAdd`, `#codesList`, `#scanResult`, `loginDNI/loginBirth`, `#cardForm`, `#historyCard`, `#payTimerHint`, `#fastLimitModal`, `#qrCajaCanvas`, `#qrSalidaCanvas`, inputs `cajaInput/segInput`, panel `#botWidget` (`#btnTobiChat`), paneles del chat (`#tobiHistoryPanel`, `#tobiAllergyPanel`, `#tobiFrequentPanel`, `#tobiRecipePanel`, `#tobiDiscountPanel`, `#tobiShoppingPanel`, `#tobiSuggest`), `manifest.json` + `qrcode@1.5.3` + `#quagga2-cdn` (`https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js`) + `app.js` + 6 `tobi-*.js` |
 | `styles.css` | Diseño mobile-first verde/blanco | variables CSS, animaciones, `.restricted-tag`, `.perf-hint`, `.card-form`, `.hist-list`, `.modal-overlay/.modal-card` responsive, `.scanner-viewport/.scanner-status/.scanner-actions/.scan-result/.codes-list`, estado `:disabled` de botones del escáner, TOBI (`.tobi-greet`, `.tobi-nudge`, `.tobi-greet-arm`), burbujas del chat (`.chat-msg`), paneles (`.tobi-history-*`, `.tobi-recipe-*`), fila de sugerencias (`.tobi-suggest`), badge de alérgenos (`.tobi-allergen-badge`), confeti, `@media print` (solo ticket) |
-| `app.js` | Lógica de negocio | catálogo 14, `calcAge/isAdultUser`, `MAX_ITEMS=40`, `isFastLimitReached/showFastLimitModal`, `scanT0/payT0`, `ORDER_KEY/HISTORY_KEY`, `saveOrder/restoreOrderUI`, `beep()`, escáner Quagga2 `isScannerLibAvailable/updateScannerAvailability/SCANNER_UNAVAILABLE_MSG/startCamera/stopCamera/onScanSuccess/handleQuaggaDetected/onScannedCode/renderCodesHelp` (`window._quaggaRunning`, `scannerRunning`, `window.__quaggaCdnFailed`, `window._quaggaDetectedBound`), validación tarjeta, checkout por pasos, TOBI (`botSay/botClose`, saludo `tobiGreetOnOpen` 2.6 s, saltito `tobiNudgeStart` cada 7 s + primer aviso 3.5 s hasta `_tobiPressedOnce`), confeti |
+| `app.js` | Lógica de negocio | catálogo 14, `calcAge/isAdultUser`, `MAX_ITEMS=40`, `isFastLimitReached/showFastLimitModal`, `scanT0/payT0`, `claveCarritoActual/claveOrdenActual`, `identidadActiva`, `limpiarHistorialRemoto/limpiarBoletaVisible`, instrumentación temporal `[scan-perf]`, `saveOrder/restoreOrderUI`, `beep()`, escáner Quagga2 `isScannerLibAvailable/updateScannerAvailability/SCANNER_UNAVAILABLE_MSG/startCamera/stopCamera/onScanSuccess/handleQuaggaDetected/onScannedCode/renderCodesHelp` (`window._quaggaRunning`, `scannerRunning`, `window.__quaggaCdnFailed`, `window._quaggaDetectedBound`), validación tarjeta, checkout por pasos, TOBI (`botSay/botClose`, saludo `tobiGreetOnOpen` 2.6 s, saltito `tobiNudgeStart` cada 7 s + primer aviso 3.5 s hasta `_tobiPressedOnce`), confeti |
 | `tobi-chat.js` | Chat propio (controlador + respuestas por reglas) | `getTobiReply(text)` + `getTobiReplyNamed(text, ctx)`, comprensión `tobiCleanText/tobiCanon/TOBI_TYPO_MAP/tobiFollowUp/tobiGuessChips/tobiSmartFallback`, `sendMsg/addMsg` (typing, scroll auto, Enter), historial UI, flujos alergias/frecuentes, intents recetas/descuentos, lista de compras, sugerencias (`renderTobiSuggest`, máx. 4) |
 | `tobi-history.js` | Historial del chat + nombre | `getUserName()` (`tottus_user` o “Cliente”), guardar/listar/abrir/borrar (`tobiHistory*`), saludo 1×/visita (`tobiGreetedThisVisit/tobiMarkGreeted`) |
 | `tobi-profile.js` | Perfil: alergias, frecuentes y lista de compras | `tobiProfile*` (alergias), `tobiFrequent*` + `tobiFrequentInCatalog()`, `tobiShopping*` (tope 50) |
 | `tobi-recipes.js` | 27 recetas + filtro de seguridad | `TOBI_RECIPES`, `TOBI_ALLERGEN_GROUPS`, `tobiRecipesFor()` (exclusión estricta + alerta por texto + ranking) |
 | `tobi-discounts.js` | 8 descuentos demo + vigentes hoy | `TOBI_DISCOUNTS`, `tobiLimaToday()` (America/Lima), `tobiDiscountsToday()` |
 | `tobi-allergens.js` | Tabla de alérgenos del catálogo + alerta | `TOBI_PRODUCT_ALLERGENS` (14 productos), `tobiProductClash()`, envoltura de `addToCart` con modal, badges vía `MutationObserver` |
-| `manifest.json` + `sw.js` | PWA mínima | manifest instalable + SW cache-first (`tottus-scan-go-v10`: app shell + 6 `tobi-*.js`) |
+| `manifest.json` + `sw.js` | PWA mínima | manifest instalable + SW cache-first (`tottus-scan-go-v12`: app shell + 6 `tobi-*.js`) |
 
 ## 4. Funcionalidades detalladas
 
@@ -136,18 +138,27 @@ tobi-profile.js → tobi-history.js → tobi-chat.js
 - Eliminados los dos párrafos informativos bajo el título (“Coloca todas las barras dentro del marco horizontal.” y “Mantén el código quieto, bien iluminado y a una distancia de 15 a 25 cm.”); no aparecen ni apagado ni activo. Se conservan título, `#scannerIdleHint` (solo apagada), `#scanAlignHint` (solo activa), `.scanner-viewport`/`#scannerStatus`, botones e ingreso manual.
 - Ajuste visual mínimo scopado a `#view-scanner`: `.scanner-card > h2 { margin: 0 0 6px }` + `.scanner-idle-hint { margin: 2px 0 10px }`; sin cambios de colores, tamaños generales, responsive ni animaciones; sin contenedores vacíos (los `<p>` usaban clases genéricas `.muted`, sin estilos exclusivos que limpiar).
 
+### 4.3e Instrumentación temporal de rendimiento del lector (`[scan-perf]`, 2026-10-21)
+> Instrumentación **temporal** de la Fase 5C (`5be1b76`). Solo memoria y consola; no persiste, no llama al backend y no incluye EAN, producto, identidad ni datos personales. **No debe retirarse hasta terminar todas las pruebas (Fase 6D).**
+
+- Un único contexto por ciclo de lectura (`scanPerfCtx`) con `scanId`, `mode`, hitos y `httpStatus`; un ciclo anterior sin emitir se cierra como `scan_restarted`.
+- Funciones: `beginScanPerf()` (al iniciar cámara), `markScanPerf(field)`, `markScanPerfToken(token, field)` (solo si el token es el contexto vigente, para que una lectura manual concurrente no contamine el ciclo de cámara), `setScanPerfHttpStatus(token, status)`, `scanPerfReadingActive()`, `emitScanPerf({ success, errorStage })` y `abortScanPerf(errorStage)`.
+- Hitos: `openAt` → `readyAt` (tras `Quagga.start()`) → `decodeAt` (`onScanSuccess`) → `lookupStartAt/EndAt` (demo) o `fetchStartAt` → `fetchHeadersAt` → `fetchJsonAt` → `fetchEndAt` (real) → `uiStartAt` → `uiEndAt` (`onScannedCode`).
+- Etapas de aborto: `scan_restarted`, `scanner_library_unavailable`, `insecure_context`, `camera_not_supported`, `camera_init`, `camera_start`, `camera_open_exception`, `camera_stopped`, `invalid_code`, `fast_limit`, `product_lookup`, `product_not_found`, `product_fetch`, `add_to_cart`.
+- Salida: un solo `console.log("[scan-perf]", {...})` con `scanner_open_to_ready_ms`, `scanner_ready_to_decode_ms`, `ean_decode_to_fetch_ms`, `product_fetch_headers_ms`, `product_fetch_json_ms`, `product_fetch_duration_ms`, `product_lookup_duration_ms`, `response_to_ui_ms`, `total_from_camera_ready_ms`, `total_from_open_ms`, `httpStatus`, `success`, `errorStage` y `timestamp`, redondeados a 0,1 ms.
+
 ### 4.4 Carrito (`addToCart`, `changeQty`, `renderCart`, RN-CAJA-RÁPIDA 40)
-- Mapa `cart = {code: qty}` persistido en `tottus_cart` vía `saveState()` (retorna `false` y no guarda si `qty > 40`).
+- Mapa `cart = {code: qty}` persistido con `saveState()` en `tottus_cart_demo` (demo) o `tottus_cart_real_<id>` (cliente real); sin contexto activo no se persiste. `saveState()` retorna `false` y no guarda si `qty > 40`. La clave antigua `tottus_cart` se conserva intacta sin migrar.
 - **Regla 40 (compra rápida):** `MAX_ITEMS = 40`; `cartTotalQty() + qty > 40` bloquea con toast + `beep(false)` + modal `#fastLimitModal` (“Límite de compras rápidas alcanzado (40 artículos). Dirígete a una caja tradicional para procesar esta compra.”) y aviso de TOBI al llegar al tope; progreso `qty/40` + badge `pop`. `btnCheckout` deshabilitado con texto `Agrega productos para continuar` si vacío.
 - **Modal:** `#fastLimitModal` (overlay `z-index:70` + `.modal-card` max 420px, responsive móvil, cierre con botón `Entendido` / clic fuera). Funciones modulares `isFastLimitReached()/showFastLimitModal()/hideFastLimitModal()`.
 - **Perf <2s:** validación O(1) + `renderAll()` + `calcTotals()` con n≤40 medido en `0.36ms` (test `qty:40, blocked41:true, under2s:true`).
 - Controles `− / +` por ítem (`changeQty` también valida tope); `Vaciar carrito` con `confirm()`.
 
 ### 4.4d Fase 2-3: order persistente, pago medido, ticket, historial, tarjeta, PWA
-- **Order persistente:** `tottus_order` (`saveOrder/loadOrder/clearOrder`); `init()` retoma con `restoreOrderUI()` + toast `🔄 Retomaste tu pago pendiente`. `issueCajaQR/issueSalidaQR` guardan; `validateSalida` guarda historial y limpia.
+- **Order persistente:** `tottus_order_demo` (demo) o `tottus_order_real_<id>` (cliente real) mediante `claveOrdenActual()` + `saveOrder/loadOrder/clearOrder`; la clave antigua `tottus_order` se conserva intacta sin migrar. `init()` retoma con `restoreOrderUI()` + toast `🔄 Retomaste tu pago pendiente` solo si hay identidad real (`!demoMode`). `issueCajaQR/issueSalidaQR` guardan; `validateSalida` guarda historial y limpia.
 - **Pago ≤60s:** `payT0` inicia en `checkout()/openCheckout()` (`#payTimerHint`); `payNow()` muestra `aprobado en Xs (meta ≤60s)` y guarda `paySecs` en `order`/boleta.
 - **Ticket imprimible:** boleta demo SUNAT (RUC demo + DNI) en `#ticketBody/#finalTicketBody` + `window.print()` (`#btnPrintTicket/#btnPrintFinal`) con `@media print` solo ticket.
-- **Historial:** `tottus_history` (máx. 20) con `ticketId/fecha/total/qty/método`; `renderHistory()` en `#historyCard` + `Borrar historial`.
+- **Historial:** demo → `tottus_demo_history` (máx. 20) con `ticketId/fecha/total/qty/método`; real con sesión → `GET /api/historial/cliente/:id` (PostgreSQL, sin fallback local); real sin sesión → mensaje «Inicia sesión para ver tu historial de compras.». `renderHistory()` pinta `#historyCard`. La clave legada `tottus_history` se conserva y todavía se escribe al cerrar una compra real, pero **no se muestra**. El botón «Borrar historial» solo está habilitado en demo y elimina únicamente `tottus_demo_history` (`actualizarBotonBorrarHistorial()`).
 - **Tarjeta demo:** `#cardForm` visible solo si método Tarjeta; valida 16 dígitos + `MM/AA` + CVV3 (solo formato, sin cobro real).
 - **PWA mínima:** `manifest.json` + `sw.js` cache-first (`./, index.html, styles.css, app.js`); registro en `init()` con `catch` silencioso.
 
@@ -254,6 +265,29 @@ saving   = Σ((oldPrice - price) × qty)
 - **Transparencia con el cliente:** notas 🔒 visibles junto a cada QR + TOBI explica verbalmente por qué caduca, por qué es de un solo uso y a quién debe mostrarse (caja ≠ seguridad).
 - Render: `QRCode.toCanvas` (CDN); sin internet → `fallbackQR()` (patrón + token, solo visual demo).
 
+### 4.9 Aislamiento demo ↔ cliente real y por cliente (2026-10-21, `e041871`)
+> Complementa §63 de `MEJORAS-IMPLEMENTADAS (1).md`. No cambia backend, base de datos, login, CORS ni Quagga2.
+
+- **Claves por contexto:** `claveCarritoActual()` y `claveOrdenActual()` devuelven `tottus_cart_demo` / `tottus_order_demo` en demo y `tottus_cart_real_<id>` / `tottus_order_real_<id>` con cliente real. Sin sesión devuelven `null`: no se lee ni se escribe una clave compartida.
+- **Claves legadas:** `tottus_cart` y `tottus_order` se conservan intactas y **no se migran** (no puede determinarse a qué modo/cliente pertenecían).
+- **Identidad visible única:** `identidadActiva()` devuelve «Cliente demo» en demo —sin leer `tottus_user`— o el perfil real con `id` entero > 0; se expone como `window.scanGoIdentidadActiva` y la usa también `getUserName()` de `tobi-history.js`.
+- **Historial en memoria:** `limpiarHistorialRemoto()` incrementa `historialSolicitud`, borra `historialRemoto`, `historialError`, `historialCargando` e `historialClienteId` y repinta. Una respuesta en vuelo de otro cliente se descarta por número de solicitud.
+- **Boleta visible:** `limpiarBoletaVisible()` oculta `#ticketCard` / `#payStep4` y vacía `#ticketBody` / `#finalTicketBody` al entrar a demo, iniciar/cerrar sesión.
+- **Boleta demo vs real:** `checkout()` rotula «BOLETA DEMO (SUNAT) / RUC demo» o «BOLETA (SUNAT) / RUC 20100123456»; `validateSalida()` rotula «SALIDA AUTORIZADA (DEMO)» y en demo no pinta DNI real.
+- **Cierre de sesión:** si se sale de demo, **no** se elimina `tottus_user` y se vuelve a la sesión real pausada; si se cierra sesión real, se elimina `tottus_user`. Antes se guardan carrito/orden del contexto y después se recargan las claves del contexto nuevo.
+- **Registro/login:** tras guardar la sesión se ejecutan `loadState()`, `loadOrder()`, `limpiarHistorialRemoto()`, `limpiarBoletaVisible()`, `updateAuthUI()`, `renderAll()` y `cargarHistorialRemoto()`.
+- **Orden pendiente:** `init()` solo restaura la orden si hay identidad real (`!demoMode`).
+- **Observación:** `sw.js` sigue en `tottus-scan-go-v12`; los commits posteriores no cambiaron el SW, por lo que un cliente PWA con caché anterior podría seguir usando el `app.js` viejo hasta actualizar la versión del caché.
+
+### 4.10 Despliegue: frontend en Vercel, API en Render, PostgreSQL dual y health check (2026-10-20)
+> Documenta `f50ecf8` (backend) y `cdaf28b` (frontend). No se modificó configuración de Vercel, Render ni Neon al documentarlos.
+
+- **Frontend → Render:** `index.html` incluye un script inline antes de `app.js` que, si `location.hostname` no es `localhost`, `127.0.0.1` ni `::1`, asigna `window.SCANGO_API_BASE_URL = "https://scan-go2-backend.onrender.com"`. `app.js` respeta ese override; si no existe, usa `http://localhost:3000` en local y `""` (mismo origen) en cualquier otro host. La URL queda fija en el HTML: *previews*, dominio propio e IP de LAN también apuntan a Render.
+- **PostgreSQL dual:** `backend/config/db.js` usa `DATABASE_URL` (con `ssl: { rejectUnauthorized: false }`) cuando tiene valor e **ignora** las `DB_*`; si está vacía, exige `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` y `DB_NAME`, valida que `DB_PORT` sea numérico y no usa SSL. El log de arranque solo indica `modo nube (DATABASE_URL)` o `modo local (DB_*)`, sin credenciales.
+- **`GET /api/health`:** ruta pública que ejecuta `SELECT NOW()`; responde **200** `{ success:true, service:"scan-go2-backend", database:"connected" }` o **503** `{ success:false, ..., database:"disconnected" }`, sin detalles del error. No sustituye autenticación ni autorización.
+- **CORS:** la lista blanca sigue viniendo de variables de entorno; este cambio no la modifica. Para que Vercel funcione, el origen exacto del despliegue debe estar permitido en Render.
+- **Límite:** no hay separación por entorno (staging/producción) ni secreto en el frontend; cambiar de backend exige editar `index.html` y volver a desplegar.
+
 ## 5. Modelo de datos (cliente)
 
 ```js
@@ -267,8 +301,14 @@ order = {
   caja:   { code, token, exp, used },
   salida: { code, token, exp, used }
 }
-tottus_order   = order persistido (retomar flujo)
-tottus_history = [{ ticketId, date, total, qty, method }] (máx. 20)
+tottus_order_demo = order persistido en demo (retomar flujo)
+tottus_order_real_<id> = order persistido por cliente real (retomar flujo)
+tottus_history = [{ ticketId, date, total, qty, method }] (máx. 20; clave legada compartida: se escribe al cerrar compra real, no se muestra)
+tottus_demo_history = [{ ticketId, date, total, qty, method }] (máx. 20; historial del modo demo)
+tottus_cart_demo = { "7750123…": qty } (carrito demo)
+tottus_cart_real_<id> = { "7750123…": qty } (carrito por cliente real)
+tottus_cart / tottus_order = claves antiguas conservadas intactas, sin migrar y sin uso
+// Nota: la demo se distingue solo por demoMode; currentClienteId() devuelve null en demo.
 tobi_chat_convos = [{ id, title(≤40), createdAt, updatedAt, messages:[{who,text,ts}] }] (30 convos / 200 msgs)
 tobi_chat_active = id última conversación (localStorage)
 tobi_chat_greeted = "1" (sessionStorage, saludo con nombre 1×/visita)
@@ -316,7 +356,7 @@ python3 -m http.server 8000
 5. Presiona la **T** de Tobi → **💬 Chatear con Tobi** (historial 🕘, alergias 🛡️, productos 🛒, recetas 🍲, ofertas 🏷️, lista 🧾).
 
 ## 8. Limitaciones conocidas (demo)
-- **Pago, caja y seguridad siguen simulados:** cualquiera puede pulsar “validar”. `localStorage` (`tottus_cart/order/history/user`) es manipulable; en producción usar pasarela real + HMAC/JWT en servidor con nonces.
+- **Pago, caja y seguridad siguen simulados:** cualquiera puede pulsar “validar”. `localStorage` (`tottus_cart_demo/real_<id>`, `tottus_order_demo/real_<id>`, `tottus_demo_history`, `tottus_user`) es manipulable; en producción usar pasarela real + HMAC/JWT en servidor con nonces. El aislamiento demo/real y por cliente es **solo de interfaz**: no sustituye la autorización en el backend (ver auditoría de Fase 6).
 - **Sesión local mínima:** el registro/login reales validan credenciales contra la API y guardan solo la proyección pública en `localStorage['tottus_user']` (sin contraseñas, hashes ni tokens). No hay JWT, cookies ni sesión de servidor: cerrar sesión borra ese perfil local y la recuperación de contraseña aún no está implementada.
 - Firma QR demo (`simpleHash` + secreto en cliente); tarjeta demo solo valida formato.
 - Escáner Quagga2 exclusivamente por CDN (`https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js`, sin copia local ni npm): requiere internet y permiso de cámara; si el CDN falla, el escaneo se deshabilita con el aviso en `#scannerStatus` y se continúa por ingreso manual (`#manualCode/#btnManualAdd`) + `beep()`. El SW cachea el app shell, no el CDN.
@@ -347,7 +387,7 @@ python3 -m http.server 8000
 3. QR caja: esperar 5 min (o forzar `exp` pasado) → “expirado”, regenerar invalida anterior.
 4. Reúso: validar caja dos veces → “QR ya usado”.
 5. Código erróneo de cajero/seguridad → “incorrecto”.
-6. Recargar a mitad del flujo: carrito persiste en `tottus_cart` y `order` persiste en `tottus_order` con QR redibujado (ya no se pierde).
+6. Recargar a mitad del flujo: el carrito persiste en `tottus_cart_demo` o `tottus_cart_real_<id>`, y la orden en `tottus_order_demo` o `tottus_order_real_<id>`, con QR redibujado. En demo, salir y volver a la sesión real no mezcla carrito, orden ni boleta.
 7. Fallback del lector: con CDN disponible `#btnStartCamera/#btnStopCamera` habilitados y `#manualCode/#btnManualAdd` operativo; simulando CDN caído (`window.__quaggaCdnFailed = true` o bloqueo de `https://cdn.jsdelivr.net/npm/@ericblade/quagga2`), `#scannerStatus` muestra “El escáner no está disponible. Puedes ingresar el código manualmente.”, los botones de cámara quedan `disabled`, el ingreso manual sigue agregando y el catálogo/carrito/TOBI no se afectan.
 8. TOBI conversacional: presionar la **T** → saludo 2.6 s (cara feliz + brazo, se repite al reabrir); con el panel cerrado, saltito cada ~7 s hasta el primer press; **Chatear con Tobi** → escribir (“hola”, “cómo pago”, “zzzqqq” → 3 botones); 🕘 retoma/borra conversaciones; recarga → retoma la última; pestaña nueva → saludo con nombre otra vez.
 9. Alergias/frecuentes: primera apertura pregunta con botones; “Sí” → dictar (`maní, lácteos y mariscos`) → confirmar → 🛡️/🛒 muestran, editan y borran; reset: borrar `tobi_profile_asked` (+ `tobi_profile_frequents_asked`) en DevTools → recarga.
@@ -355,6 +395,46 @@ python3 -m http.server 8000
 11. Alerta catálogo: con `lactosa`, Leche + Agregar → modal de coincidencia (Agregar igual / No agregar); Inca Kola → aviso suave de no verificada; badge “⚠️ Contiene lactosa” en la tarjeta.
 
 ## Historial de cambios técnicos
+
+### Backend dual (local/Neon) y conexión Vercel → Render (2026-10-20; documentado 2026-10-22)
+> Registro de dos commits que no figuraban en esta documentación. No se modificó código al documentarlos.
+
+**`f50ecf8` — `feat(backend): soporte dual PostgreSQL local/Neon y endpoint /api/health`**
+- `backend/config/db.js`: si `DATABASE_URL` tiene valor, el `Pool` usa `connectionString` + `ssl: { rejectUnauthorized: false }` y se ignoran las `DB_*`; si está vacía, exige `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` y `DB_NAME`, valida `DB_PORT` numérico y no usa SSL.
+- El log de arranque ya no imprime usuario/host/base; solo `[db] Pool configurado en modo nube (DATABASE_URL)` o `modo local (DB_*)`.
+- `backend/.env.example`: añade `NODE_ENV`, deja `DATABASE_URL=` vacío y reemplaza credenciales por `CAMBIAR`.
+- `GET /api/health` (público): `SELECT NOW()` → **200** `{ success:true, service:"scan-go2-backend", database:"connected" }` o **503** `{ success:false, ..., database:"disconnected" }`, sin exponer el error.
+- Archivos: `backend/config/db.js`, `backend/src/app.js`, `backend/.env.example`. Sin cambios de esquema, rutas de negocio ni CORS.
+
+**`cdaf28b` — `feat(frontend): conectar Vercel con backend de Render`**
+- `frontend/index.html` añade, antes de `app.js`, un script que asigna `window.SCANGO_API_BASE_URL = "https://scan-go2-backend.onrender.com"` cuando el host no es `localhost`, `127.0.0.1` ni `::1`.
+- `app.js` respeta el override; en local usa `http://localhost:3000` y, sin override, el mismo origen. Cualquier despliegue no local (incluidos *previews*) apunta a Render.
+- La URL está fija en el HTML: no hay separación staging/producción. El CORS del backend debe permitir el origen de Vercel; este commit no lo modificó.
+- Archivo: `frontend/index.html`. Sin cambios en `app.js`, backend ni base de datos.
+
+### Aislamiento demo ↔ cliente real, historial demo y rendimiento del lector (2026-10-21; documentado 2026-10-22)
+> Registro de los tres commits que no figuraban en esta documentación. No se modificó código al documentarlos.
+
+**`e041871` — `fix(frontend): aislar datos entre demo y usuario real`**
+- Carrito y orden dejan de usar claves globales: `tottus_cart_demo` / `tottus_cart_real_<id>` y `tottus_order_demo` / `tottus_order_real_<id>` mediante `claveCarritoActual()` y `claveOrdenActual()`. Las claves antiguas `tottus_cart` y `tottus_order` se conservan intactas y no se migran.
+- `identidadActiva()` se convierte en la fuente única de identidad visible (demo = «Cliente demo» sin leer `tottus_user`); se expone como `window.scanGoIdentidadActiva` y `getUserName()` de `tobi-history.js` pasa a usarla.
+- `limpiarBoletaVisible()` evita que una boleta demo quede visible en modo real (y al revés). `limpiarHistorialRemoto()` + `historialSolicitud` descartan respuestas en vuelo de otra sesión.
+- `enterDemo()`, registro, login, `init()` y cierre de sesión recargan el contexto correcto. El cierre distingue «Salir de demo» (conserva `tottus_user`) de cerrar sesión real (elimina `tottus_user`).
+- `firstName()`, `buildPreTicket()` y `validateSalida()` usan `identidadActiva()`; las boletas se rotulan como demo o reales y en demo no muestran DNI real.
+- Archivos: `frontend/app.js`, `frontend/tobi-history.js`. Sin cambios en backend, base de datos, CORS ni Quagga2.
+- Observación: `frontend/sw.js` permaneció en `tottus-scan-go-v12`; conviene revisar la versión del caché antes de publicar.
+
+**`ced9665` — `fix(history): corregir borrado del historial demo`**
+- El botón «Borrar historial» borraba `tottus_history` (clave legada) y no `tottus_demo_history`.
+- Nueva `actualizarBotonBorrarHistorial()`: en demo habilita «Borrar historial»; en real lo deshabilita y muestra «El historial real no puede eliminarse desde esta versión».
+- El listener solo elimina `tottus_demo_history` en demo, repinta y avisa «Historial demo borrado»; en real no toca storage.
+- Archivo: `frontend/app.js`. El historial real sigue viviendo en PostgreSQL y no tiene endpoint `DELETE`.
+
+**`5be1b76` — `chore(frontend): instrumentar rendimiento del lector`**
+- Instrumentación temporal `[scan-perf]` de la Fase 5C: un contexto por ciclo (`beginScanPerf`), hitos con `markScanPerf` / `markScanPerfToken`, estado HTTP con `setScanPerfHttpStatus`, emisión única con `emitScanPerf` y cierre de errores con `abortScanPerf`.
+- Mide apertura de cámara → `readyAt`, `decodeAt`, `fetch` del producto (headers/JSON/fin y HTTP), búsqueda local en demo, render de UI y totales; imprime un solo `console.log("[scan-perf]", {...})`.
+- Solo memoria y consola: no persiste, no envía datos al backend y no incluye EAN, producto, identidad ni datos personales. **No debe retirarse hasta terminar las pruebas (Fase 6D).**
+- Archivo: `frontend/app.js`.
 
 ### Fase 5 — Registro e inicio de sesión reales con correo y contraseña (2026-10-21)
 **Objetivo:** conectar los formularios existentes con los endpoints reales, conservar una sesión mínima segura, mantener la demo separada y retirar el DNI como mecanismo de inicio de sesión.
@@ -392,7 +472,7 @@ python3 -m http.server 8000
 - **Google queda preparado en el backend pero desactivado en el frontend.** El botón «G» (`#btnGoogleAccess`) **no** llama a `POST /api/auth/google`, **no** carga Google Identity Services, **no** abre formularios ni crea usuarios: solo abre un **modal propio de Scan & Go** (`#googleModal`), cerrable con «Entendido», con el botón ✕ o con `Escape`, con `role="dialog"`, `aria-modal`, `aria-label` y foco gestionado. Muestra: «Acceso con Google próximamente» + «El backend ya está preparado para validar cuentas de Google. Esta opción se habilitará cuando se configuren las credenciales oficiales. Por ahora, inicia sesión con tu correo y contraseña.» No imita el selector oficial de Google ni pide correo, contraseña o nombre. Para habilitarlo se necesitará `GOOGLE_CLIENT_ID` y conectar el `credential` real.
 - **Modo demostración claramente identificado:** la demo se activa **únicamente** con el botón «Ver demostración» (`#btnDemo`) y entra a un modo de prueba de **solo memoria** (`demoMode`) —nunca se persiste— que muestra el distintivo permanente «Modo demostración» (`#demoBadge`), no pide ni guarda correos, no crea un perfil de cliente y no representa una sesión autenticada. Desde la Fase 5, el formulario de correo es el login real y ya no activa la demo.
 - **No se usa autenticación falsa:** no se crean tokens, correos ni `google_id` inventados. Se retiró el mensaje temporal de prueba/desarrollo del registro («Se requiere un servidor para crear una cuenta real»).
-- `API_BASE_URL`: local (`localhost`/`127.0.0.1`) → `http://localhost:3000`; en despliegue → mismo origen, o `window.SCANGO_API_BASE_URL` si el backend vive en otra URL (sin URL local fija en producción).
+- `API_BASE_URL`: local (`localhost`/`127.0.0.1`/`::1`) → `http://localhost:3000`; en cualquier otro host, `index.html` define `window.SCANGO_API_BASE_URL = "https://scan-go2-backend.onrender.com"` (ver §4.10). Si el override no existe, `app.js` usa el mismo origen. La URL de Render está fija en el HTML y no se separa por entorno.
 
 #### Cambios aplicados en la revisión (archivo por archivo)
 **`frontend/index.html`**
