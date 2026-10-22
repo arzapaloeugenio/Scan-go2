@@ -1289,7 +1289,23 @@ async function onScannedCode(rawCode) {
   scanT0 = 0;
 }
 
+// El botón solo puede borrar el historial simulado de demo. El historial real
+// se deriva de órdenes persistidas en el backend y no tiene endpoint DELETE:
+// se deshabilita y se muestra un mensaje honesto en lugar de simular el borrado.
+function actualizarBotonBorrarHistorial() {
+  const btn = $("btnClearHistory");
+  if (!btn) return;
+  btn.disabled = !demoMode;
+  btn.textContent = demoMode
+    ? "Borrar historial"
+    : "El historial real no puede eliminarse desde esta versión";
+  btn.title = demoMode
+    ? "Borra solo el historial del modo demo"
+    : "El historial real proviene de tus compras registradas en el servidor.";
+}
+
 function renderHistory() {
+  actualizarBotonBorrarHistorial();
   const el = $("historyList");
   if (!el) return;
   if (!demoMode && currentClienteId() === null) {
@@ -2375,8 +2391,12 @@ async function init() {
   if (btnPrintF) btnPrintF.addEventListener("click", () => window.print());
   const btnClearH = $("btnClearHistory");
   if (btnClearH) btnClearH.addEventListener("click", () => {
-    try { localStorage.removeItem(HISTORY_KEY); } catch { /* noop */ }
+    // Solo demo: el historial real vive en el backend y no debe simularse
+    // su eliminación (reaparecería al recargar).
+    if (!demoMode) return;
+    try { localStorage.removeItem(DEMO_HISTORY_KEY); } catch { /* noop */ }
     renderHistory();
+    toast("Historial demo borrado");
   });
   const btnFast = $("btnCloseFastModal");
   if (btnFast) btnFast.addEventListener("click", hideFastLimitModal);
