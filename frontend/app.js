@@ -9,22 +9,30 @@ const QR_CAJA_TTL_SEC = 5 * 60;
 const QR_SALIDA_TTL_SEC = 3 * 60;
 const QR_SECRET = "tottus-scan-go-demo";
 // URL base del backend. Punto único de configuración de la API.
-// - Desarrollo local (localhost/127.0.0.1): backend en http://localhost:3000.
-// - Despliegue: por defecto se usa el MISMO origen (backend que sirve el frontend).
-//   Si el backend vive en otra URL, se define antes de cargar app.js:
-//     <script>window.SCANGO_API_BASE_URL = "https://mi-backend.example.com";</script>
-// Esto evita depender de una URL local fija en producción.
+// - Desarrollo local (loopback o IPv4 privada): mismo hostname, puerto 3000.
+// - Despliegue publicado (Vercel): backend público en Render.
+// Si el backend vive en otra URL, se puede definir antes de cargar app.js:
+//   <script>window.SCANGO_API_BASE_URL = "https://mi-backend.example.com";</script>
+function esHostLocal(host) {
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1") return true;
+  const octetos = host.split(".").map(Number);
+  if (octetos.length !== 4) return false;
+  if (octetos.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+  if (octetos[0] === 10) return true;
+  if (octetos[0] === 192 && octetos[1] === 168) return true;
+  return octetos[0] === 172 && octetos[1] >= 16 && octetos[1] <= 31;
+}
 const API_BASE_URL = (() => {
   const override = (typeof window !== "undefined" && window.SCANGO_API_BASE_URL) || "";
   if (String(override).trim() !== "") {
     return String(override).trim().replace(/\/+$/, "");
   }
   const host = (typeof location !== "undefined" && location.hostname) || "";
-  // Desarrollo local: localhost, 127.0.0.1, IPv6 local o archivo abierto directamente.
-  if (host === "" || host === "localhost" || host === "127.0.0.1" || host === "::1") {
-    return "http://localhost:3000";
-  }
-  return ""; // despliegue: mismo origen (o window.SCANGO_API_BASE_URL)
+  // file:// (host vacío): se conserva el acceso al backend local.
+  if (host === "") return "http://localhost:3000";
+  if (host === "::1") return "http://[::1]:3000";
+  if (esHostLocal(host)) return `http://${host}:3000`;
+  return "https://scan-go2-backend.onrender.com";
 })();
 
 // Catálogo local de respaldo (se conserva intacto). Se usa cuando la API no responde.

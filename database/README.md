@@ -9,7 +9,8 @@ database/
 │   ├── 01-create-tables.sql   # Creación de tablas, restricciones e índices
 │   └── 02-insert-data.sql     # Datos iniciales (productos y cliente demo)
 ├── migrations/
-│   └── 001-google-auth-clientes.sql   # Preparación de `cliente` para Google OAuth
+│   ├── 001-google-auth-clientes.sql   # Preparación de `cliente` para Google OAuth
+│   └── 002-add-password-hash-clientes.sql  # Hash bcrypt para login local
 ├── data/
 │   └── .gitkeep               # Reservado para dumps/backups locales (no versionados)
 └── README.md
@@ -30,10 +31,18 @@ psql -h localhost -p 5432 -U postgres -d tottus_scan_go -f database/init/01-crea
 
 # 2) Insertar datos iniciales
 psql -h localhost -p 5432 -U postgres -d tottus_scan_go -f database/init/02-insert-data.sql
+
+# 3) Aplicar migraciones en orden
+psql -h localhost -p 5432 -U postgres -d tottus_scan_go -f database/migrations/001-google-auth-clientes.sql
+psql -h localhost -p 5432 -U postgres -d tottus_scan_go -f database/migrations/002-add-password-hash-clientes.sql
 ```
 
 Ambos scripts son **idempotentes**: pueden ejecutarse varias veces sin errores
 ni duplicación de datos (`CREATE ... IF NOT EXISTS`, `ON CONFLICT ...`).
+
+**Importante:** el paso 3 es obligatorio también en una base nueva. El esquema
+base no incluye `password_hash`; sin la migración `002` el registro y el login
+local fallan con `no existe la columna «password_hash»`.
 
 ## Actualizar una base ya existente
 
@@ -42,6 +51,7 @@ las migraciones en orden:
 
 ```powershell
 psql -h localhost -p 5432 -U postgres -d tottus_scan_go -f database/migrations/001-google-auth-clientes.sql
+psql -h localhost -p 5432 -U postgres -d tottus_scan_go -f database/migrations/002-add-password-hash-clientes.sql
 ```
 
 Las migraciones también son idempotentes y no destructivas.
@@ -60,6 +70,7 @@ Las migraciones también son idempotentes y no destructivas.
 | `email`            | VARCHAR(150)  | UNIQUE                            | Nuevo (Google OAuth)                            |
 | `foto_url`         | TEXT          |                                   | Nuevo (foto de perfil de Google)                |
 | `google_id`        | VARCHAR(255)  | UNIQUE                            | Nuevo (identificador "sub" de Google)           |
+| `password_hash`    | TEXT          | NULL permitido                    | Hash bcrypt del login local; nunca la contraseña |
 
 ## Adaptaciones respecto a las instrucciones originales
 

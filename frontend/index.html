@@ -474,12 +474,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script id="quagga2-cdn" src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js" onerror="window.__quaggaCdnFailed=true"></script>
-  <!-- Fase 4: backend público en Render. En localhost/127.0.0.1 se conserva http://localhost:3000. -->
-  <script>
-    if (location.hostname && location.hostname !== "localhost" && location.hostname !== "127.0.0.1" && location.hostname !== "::1") {
-      window.SCANGO_API_BASE_URL = "https://scan-go2-backend.onrender.com";
-    }
-  </script>
   <script src="app.js"></script>
   <script src="tobi-allergens.js"></script>
   <script src="tobi-discounts.js"></script>

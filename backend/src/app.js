@@ -21,11 +21,28 @@ const app = express();
 //   FRONTEND_URL=https://tu-frontend.example.com
 //   FRONTEND_URL_LOCAL=http://localhost:8000
 const origenesPermitidos = [
+  // Frontend publicado (Vercel); se conserva ademas la configuracion por entorno.
+  'https://scan-go2-frontend.vercel.app',
   ...(process.env.FRONTEND_URL || '').split(','),
   ...(process.env.FRONTEND_URL_LOCAL || '').split(','),
 ]
   .map((origen) => origen.trim())
   .filter(Boolean);
+
+// Origenes de desarrollo local: HTTP en el puerto 8000 desde loopback o IPv4 privada.
+// No se admite cualquier origen de internet ni comodines.
+function esOrigenLocalDesarrollo(origen) {
+  const coincidencia = /^http:\/\/([^:/]+|\[[^\]]+\]):8000$/.exec(origen);
+  if (!coincidencia) return false;
+  const host = coincidencia[1];
+  if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return true;
+  const octetos = host.split(".").map(Number);
+  if (octetos.length !== 4) return false;
+  if (octetos.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+  if (octetos[0] === 10) return true;
+  if (octetos[0] === 192 && octetos[1] === 168) return true;
+  return octetos[0] === 172 && octetos[1] >= 16 && octetos[1] <= 31;
+}
 
 app.use(
   cors({
@@ -34,7 +51,7 @@ app.use(
       if (!origen) {
         return callback(null, true);
       }
-      if (origenesPermitidos.includes(origen)) {
+      if (origenesPermitidos.includes(origen) || esOrigenLocalDesarrollo(origen)) {
         return callback(null, true);
       }
       // Origen no permitido: sin cabecera CORS (el navegador lo bloquea).
@@ -101,7 +118,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`[server] Servidor activo en puerto ${PORT}`);
 });
 
