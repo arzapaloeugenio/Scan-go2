@@ -1,0 +1,31 @@
+# Dependencias locales: se reinstalan dentro de la imagen con npm ci.
+node_modules
+**/node_modules
+
+# Variables de entorno y secretos: nunca deben entrar a la imagen.
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Logs y temporales.
+*.log
+logs
+**/logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Metadatos del repositorio y del editor.
+.git
+.gitignore
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Archivos que no forman parte del runtime.
+Dockerfile
+.dockerignore
+README.md
