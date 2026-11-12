@@ -14,6 +14,8 @@ const clienteRoutes = require('./routes/clienteRoutes');
 const pool = require('../config/db');
 
 const app = express();
+// No divulgar el framework en las respuestas HTTP.
+app.disable('x-powered-by');
 
 // CORS: se permiten SOLO los origenes configurados por variables de entorno.
 // No se usa origin: "*" ni credentials (en esta etapa no hay cookies de sesion).
