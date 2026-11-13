@@ -141,8 +141,7 @@ function tobiWrapAddToCart() {
   try {
     if (window._tobiOrigAddToCart || typeof addToCart !== "function") return;
     window._tobiOrigAddToCart = addToCart;
-    // eslint-disable-next-line no-global-assign, no-func-assign
-    addToCart = function (code, qty) {
+    window.addToCart = function (code, qty) {
       try {
         qty = qty === undefined ? 1 : qty;
         const prod = (typeof PRODUCTS !== "undefined")
