@@ -1119,7 +1119,7 @@ function getTobiReplyNamed(text, ctx) {
         check.type = "checkbox";
         check.checked = !!it.bought;
         check.setAttribute("aria-label", "Marcar comprado: " + it.name);
-        check.addEventListener("change", () => renderTobiShoppingRefresh(tobiShoppingToggle(idx)));
+        check.addEventListener("change", () => { tobiShoppingToggle(idx); renderTobiShoppingRefresh(); });
         const nm = document.createElement("b");
         nm.textContent = it.name;
         row.appendChild(check);
@@ -1146,7 +1146,7 @@ function getTobiReplyNamed(text, ctx) {
         del.className = "tobi-allergy-del";
         del.textContent = "🗑️";
         del.setAttribute("aria-label", "Quitar " + it.name);
-        del.addEventListener("click", () => renderTobiShoppingRefresh(tobiShoppingRemove(idx)));
+        del.addEventListener("click", () => { tobiShoppingRemove(idx); renderTobiShoppingRefresh(); });
         row.appendChild(del);
         list.appendChild(row);
       });
