@@ -2,7 +2,7 @@
 
 > App web móvil para la cadena de supermercados **Tottus**: el cliente escanea productos con su celular, paga desde el navegador, valida su compra en **Caja** y su salida con **Seguridad** mediante **QR temporales anti-captura**, guiado en todo momento por **TOBI 🤖**, el robot asistente de la marca.
 
-- **Stack:** HTML + CSS + JavaScript puros (archivos independientes, sin framework ni backend). Todo el código fue generado con **Opencode** (sin Google Studio).
+- **Stack:** HTML + CSS + JavaScript puros en el frontend (archivos independientes, sin framework). Desde V3.0 el proyecto incorpora además backend, microservicios y PostgreSQL; ver la sección «Actualización V3.0» al final de este documento. Todo el código fue generado con **Opencode** (sin Google Studio).
 - **Persistencia:** `localStorage` del navegador (demo académica). Simula las colecciones Firebase `Cliente/Producto/Carrito/Sesion` exigidas en el informe (alcance 1.5: un sector + pasarela de prueba).
 - **Paleta:** verde + blanco + amarillo suave (`--green: #40a629`, `--green-deep: #01855d`, `--yellow: #feeb15`, fondo `#f5f7f4`). `index.html` + `styles.css` se mantienen como base, solo se extiende.
 - **Extras UX:** TOBI (robot guía con burbuja parlante + saludo animado), chat propio con Tobi (respuestas por reglas, sin IA), confeti al finalizar la compra, login con ver/ocultar contraseña + DNI/edad (RN02).
@@ -62,7 +62,7 @@ app.js → tobi-allergens.js → tobi-discounts.js → tobi-recipes.js →
 tobi-profile.js → tobi-history.js → tobi-chat.js
 ```
 - `tobi-chat.js` nunca modifica `app.js`: reutiliza sus globales solo con guardas (`typeof showView/stopCamera/botClose/toast === "function"`).
-- El SW (`tottus-scan-go-v11`, cache-first) precachea el app shell + los 6 `tobi-*.js`.
+- El SW (`tottus-scan-go-v13`, cache-first) precachea el app shell + los 6 `tobi-*.js`.
 
 - **SPA con backend PERN:** el frontend concentra la interfaz y la lógica de cliente, pero catálogo, autenticación (registro/login por correo), historial y órdenes consumen la API Node/Express/PostgreSQL vía `API_BASE_URL`. El “pago”, la “caja” y “seguridad” siguen siendo simulaciones con botones demo + ingreso manual de 6 dígitos (en producción se reemplazarían por pasarela real y escáner del personal).
 - **Vistas SPA:** `login · home · scanner · cart · checkout · tobi`, conmutadas con `showView(nombre)` (una visible a la vez; la vista `tobi` la conmuta `tobi-chat.js` reutilizando `showView` para volver).
@@ -80,7 +80,7 @@ tobi-profile.js → tobi-history.js → tobi-chat.js
 | `tobi-recipes.js` | 27 recetas + filtro de seguridad | `TOBI_RECIPES`, `TOBI_ALLERGEN_GROUPS`, `tobiRecipesFor()` (exclusión estricta + alerta por texto + ranking) |
 | `tobi-discounts.js` | 8 descuentos demo + vigentes hoy | `TOBI_DISCOUNTS`, `tobiLimaToday()` (America/Lima), `tobiDiscountsToday()` |
 | `tobi-allergens.js` | Tabla de alérgenos del catálogo + alerta | `TOBI_PRODUCT_ALLERGENS` (14 productos), `tobiProductClash()`, envoltura de `addToCart` con modal, badges vía `MutationObserver` |
-| `manifest.json` + `sw.js` | PWA mínima | manifest instalable + SW cache-first (`tottus-scan-go-v12`: app shell + 6 `tobi-*.js`) |
+| `manifest.json` + `sw.js` | PWA mínima | manifest instalable + SW cache-first (`tottus-scan-go-v13`: app shell + 6 `tobi-*.js`) |
 
 ## 4. Funcionalidades detalladas
 
@@ -548,3 +548,167 @@ Registro de las pruebas ejecutadas sobre el backend + PostgreSQL reales (puerto 
 ### Simplificación de textos del lector (pendiente de commit)
 - `index.html`: eliminados 2 `<p>` (marco horizontal + distancia 15–25 cm), sin tocar lógica ni botones.
 - `styles.css`: `+ .scanner-card > h2 { margin: 0 0 6px }`, `.scanner-idle-hint` a `margin: 2px 0 10px`; `.scanner-viewport` y responsive intactos. `git diff --stat`: solo `frontend/index.html` + `frontend/styles.css`.
+
+---
+
+# Actualización V3.0 — Migración incremental a microservicios
+
+Esta sección documenta el estado actual del proyecto tras la extracción de catálogo y órdenes. Las secciones anteriores conservan el registro histórico del frontend y del backend; donde hablan de un único backend, debe leérselas con el contexto de arquitectura V3.0 que sigue.
+
+## 1. Motivo del cambio
+
+El backend concentraba catálogo, descuentos, carrito, órdenes, historial, clientes y autenticación. El objetivo fue separar dominios sin modificar contratos HTTP, esquema de PostgreSQL ni comportamiento visible, manteniendo el backend original como mecanismo de rollback. La migración es incremental y académica: primero se extrajo la lectura del catálogo y después el dominio de órdenes.
+
+## 2. Arquitectura anterior
+
+```text
+Navegador
+  → frontend estático (Python http.server / despliegue estático)
+      → API_BASE_URL → backend Node.js/Express :3000
+                          → PostgreSQL
+```
+
+El frontend calculaba `API_BASE_URL` y apuntaba a `localhost:3000` en local o a un backend remoto en el despliegue. La persistencia de demo vivía en `localStorage`; carrito real, órdenes e historial ya se apoyaban en la API.
+
+## 3. Arquitectura V3.0
+
+```text
+Navegador
+  → Nginx/frontend :8000
+      → backend :3000
+      → product-service :3001
+      → order-service :3002
+          → PostgreSQL :5432 (interno, hostname db)
+```
+
+Los cinco servicios se orquestan con Docker Compose en la red `scan-go2`. Nginx es el punto de entrada y un API Gateway básico; el descubrimiento interno lo resuelve el DNS de Docker.
+
+## 4. Cambios del Bloque 1
+
+- `frontend/app.js` usa el mismo origen cuando la página se sirve en `localhost:8000` o `127.0.0.1:8000`: `API_BASE_URL` devuelve `""`, así que las llamadas son `/api/...` y no necesitan el puerto del backend.
+- `frontend/nginx.conf` conserva el prefijo `/api/` al hacer `proxy_pass http://backend:3000` en `location /api/`.
+- El service worker pasó a la caché `tottus-scan-go-v13`. Las referencias antiguas a `v11`/`v12` en este documento quedan corregidas.
+- Las cabeceras de seguridad globales y la CSP en modo Report-Only se mantuvieron sin cambios.
+
+## 5. Cambios del Bloque 2
+
+Se creó `product-service` en el puerto interno `3001`:
+
+- `GET /api/products`, `GET /api/products/:codigoBarras`, `GET /api/productos`, `GET /api/productos/:codigoBarras`, `GET /api/descuentos`, `GET /health`.
+- Es de solo lectura: ejecuta `SELECT`, nunca `INSERT`, `UPDATE` ni `DELETE`.
+- Convierte `precio`, `precioAntiguo`, `ahorro` y `descuento` a `Number`, y conserva `restringido` como booleano.
+- `GET /health` comprueba PostgreSQL con `SELECT 1`.
+- Validación comparativa: JSON idéntico al backend para productos y descuentos; catálogo de 14 productos.
+
+## 6. Cambios del Bloque 3
+
+Se creó `order-service` en el puerto interno `3002`:
+
+- Carrito: seis rutas reales (`GET /cliente/:idCliente`, `POST /`, `GET /:id`, `POST /:id/productos`, `DELETE /:id/productos/:codigoBarras`, `PUT /:id/confirmar`).
+- Órdenes: `POST /`, `GET /cliente/:idCliente`, `GET /:id`.
+- Historial: `GET /cliente/:idCliente`.
+- Health: `GET /health` con `SELECT 1`.
+- Conserva `BEGIN`, `COMMIT`, `ROLLBACK` y `client.release()`; todas las consultas son parametrizadas.
+- Valida cuerpo, cliente, items, código de barras y cantidad sin cambiar mensajes ni códigos HTTP.
+- Se realizó una compra controlada de cantidad 1 para el Cliente Demo: HTTP 201, total coherente y una sola orden nueva. No se borró esa orden.
+
+## 7. Responsabilidades por servicio
+
+| Servicio | Responsabilidad | Health check |
+| --- | --- | --- |
+| `frontend` | Estáticos y proxy inverso | `GET /` |
+| `backend` | Clientes, registro, login, Google Auth, health general y rutas legacy | `GET /api/health` |
+| `product-service` | Catálogo, alias y descuentos de solo lectura | `GET /health` |
+| `order-service` | Carrito persistido, órdenes e historial | `GET /health` |
+| `db` | PostgreSQL compartido | `pg_isready` |
+
+## 8. Rutas y destino
+
+| Ruta | Destino |
+| --- | --- |
+| `/api/products`, `/api/products/*` | `product-service:3001` |
+| `/api/productos`, `/api/productos/*` | `product-service:3001` |
+| `/api/descuentos`, `/api/descuentos/*` | `product-service:3001` |
+| `/api/carrito`, `/api/carrito/*` | `order-service:3002` |
+| `/api/ordenes`, `/api/ordenes/*` | `order-service:3002` |
+| `/api/historial`, `/api/historial/*` | `order-service:3002` |
+| Resto de `/api/*` | `backend:3000` |
+
+## 9. Flujo del catálogo
+
+```http
+GET /api/products HTTP/1.1
+Host: localhost:8000
+```
+
+Nginx entrega la petición a `product-service:3001`; el modelo ejecuta `SELECT ... FROM producto ORDER BY nombre`, normaliza cada fila y responde `{ "success": true, "data": [...] }`. Si la API no responde, `app.js` mantiene su catálogo local de respaldo, comportamiento anterior conservado.
+
+## 10. Flujo del checkout
+
+```http
+POST /api/ordenes HTTP/1.1
+Host: localhost:8000
+Content-Type: application/json
+```
+
+El navegador envía `usuarioId` e `items` con `codigoBarras` y `cantidad`. `order-service` valida la entrada, inicia la transacción, verifica el cliente, inserta la cabecera, valida cada producto, inserta detalles con aritmética decimal en SQL, calcula el total con `SUM(subtotal)`, actualiza el monto, confirma con `COMMIT` y libera la conexión. Ante error ejecuta `ROLLBACK`. La respuesta es `201` con `compraId`, `total` e `items`.
+
+## 11. Flujo del login
+
+El registro y el inicio de sesión siguen en el backend por `location /api/`: `POST /api/clientes/registro` y `POST /api/clientes/login`. La autenticación con Google continúa en `POST /api/auth/google` si está configurada. No se modificaron `localStorage`, `sessionStorage` ni la proyección pública guardada en `tottus_user`.
+
+## 12. Contratos preservados
+
+- Estructura `{ success, data }` en las respuestas correctas y `{ success, message }` en los errores.
+- Nombres de propiedades, orden del catálogo y mensajes de error del backend original.
+- Códigos HTTP 200, 201, 400, 404, 409 y 500 según corresponda.
+- Equivalencia verificada entre backend y microservicios en los GET comparados.
+
+## 13. Funciones protegidas
+
+Se procuró no alterar: catálogo y descuentos, login y registro, carrito, scanner, QR, Font Awesome, Tobi y sus módulos, historial remoto y demo, alergias, restricción +18, límite de 40, modo demo, sesión real, separación de carritos, service worker, `localStorage` y `sessionStorage`.
+
+## 14. Seguridad preservada
+
+Nginx conserva `server_tokens off`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Permissions-Policy: camera=(self)` y `Content-Security-Policy-Report-Only`, sin CSP bloqueante. Los servicios Express usan `app.disable("x-powered-by")` y no abren CORS. Las consultas son parametrizadas; `product-service` es de solo lectura y `order-service` mantiene su transacción ACID. PostgreSQL no se publica en el host.
+
+`.env.docker` es local y está ignorado por Git: no debe subirse. No se debe emplear `docker compose --env-file .env.docker down -v` si se quieren conservar los datos. Los scripts de inicialización solo se ejecutan cuando el volumen se crea vacío, y cambiar la contraseña en el archivo no modifica la de un volumen existente.
+
+## 15. Pruebas automáticas ejecutadas
+
+- Cinco servicios en estado healthy y `nginx -t` correcto.
+- 14 productos con tipos conservados; JSON de `product-service` idéntico al backend para productos y descuentos.
+- GET de carrito, órdenes e historial idénticos entre backend y `order-service`.
+- Casos inválidos 400 y 404 sin variar el número de órdenes.
+- Una compra controlada del Cliente Demo con incremento exacto de una orden y sin duplicados.
+- Cabeceras presentes en respuestas 200 y 404; ninguna respuesta 502 en las pruebas reportadas.
+
+`./scripts/docker-check.sh` valida únicamente `db`, `backend` y `frontend`; la verificación de los dos microservicios se hizo con comandos manuales de health y con `docker compose ps`.
+
+## 16. Pruebas manuales pendientes
+
+Recarga forzada en `http://localhost:8000`, login, carrito visual, límite de 40, restricción +18, checkout con QR, historial, separación demo/real, Tobi, catálogo y scanner, y revisión de la consola y la pestaña Network para confirmar que productos pasan por `/api/products`, órdenes por `/api/ordenes` e historial por su ruta actual. No se afirma que estas pruebas se hayan ejecutado.
+
+## 17. Riesgos
+
+- Los tres servicios de API comparten una única base PostgreSQL.
+- El backend mantiene código duplicado y rutas legacy que pueden divergir si se modifica un contrato en un solo lugar.
+- No hay autenticación interna entre servicios: la confianza se basa en la red de Compose.
+- Nginx no aplica limitación de tasa ni validación de esquema; es un gateway básico.
+
+## 18. Rollback
+
+Las rutas extraídas permanecen en el backend. Para revertir, Nginx puede volver a enviar esos prefijos a `backend:3000` y detenerse los microservicios sin eliminar el volumen de PostgreSQL. No hubo cambios de esquema ni migraciones que deshacer; la orden creada durante la prueba es un dato válido y se conserva.
+
+## 19. Deuda técnica
+
+Base compartida, sin propiedad exclusiva de tablas, duplicación parcial de código, rutas legacy en el backend, ausencia de bases por servicio, sin mensajería asíncrona (ni Kafka ni RabbitMQ), sin Kubernetes ni service mesh, y sin autenticación interna entre servicios. Nginx cumple el rol de API Gateway básico y Docker DNS el de descubrimiento de servicios.
+
+## 20. Trabajo futuro
+
+- Separar la base de datos o los esquemas por servicio.
+- Definir propiedad exclusiva de tablas y eliminar la duplicación de código.
+- Retirar las rutas legacy del backend cuando no se necesiten como respaldo.
+- Ampliar `docker-check.sh` para validar los cinco servicios.
+- Evaluar autenticación entre servicios y observabilidad centralizada si el alcance deja de ser académico.
+- Mantener CSP Report-Only hasta verificar todos los orígenes antes de activar una CSP bloqueante.
