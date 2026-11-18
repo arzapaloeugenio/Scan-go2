@@ -1,0 +1,9 @@
+{
+  "name": "Tottus Scan & Go",
+  "short_name": "ScanGo",
+  "display": "standalone",
+  "start_url": "./index.html",
+  "background_color": "#f2fbf5",
+  "theme_color": "#008542",
+  "icons": []
+}

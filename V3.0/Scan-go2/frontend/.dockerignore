@@ -1,0 +1,30 @@
+# Dependencias locales (el frontend es estático y no las necesita).
+node_modules
+**/node_modules
+
+# Variables de entorno y secretos: nunca deben entrar a la imagen.
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Logs y temporales.
+*.log
+logs
+**/logs
+
+# Metadatos del repositorio y del editor.
+.git
+.gitignore
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Documentación: no se sirve en la aplicación.
+*.md
+
+# Archivos de build de la imagen.
+Dockerfile
+.dockerignore

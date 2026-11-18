@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#008542" />
+  <title>Tottus Scan & Go | Compra desde tu celular</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="manifest" href="manifest.json" />
+</head>
+<body class="access-mode">
+  <!-- HEADER -->
+  <header class="app-header" id="appHeader" hidden>
+    <div class="header-inner">
+      <div class="logo">
+        <div>
+          <img src="img/Logo_Tottus.png" class="main-logo" alt="Tottus Scan & Go" />
+          <small id="headerUser">Hola, cliente</small>
+          <small id="demoBadge" class="demo-badge" hidden>Modo demostración</small>
+        </div>
+      </div>
+      <button class="icon-btn cart-btn" id="btnGoCart" aria-label="Ver carrito">
+        🛒
+        <span class="cart-badge" id="cartBadge">0</span>
+      </button>
+    </div>
+    <div class="search-bar">
+      <span>🔍</span>
+      <input type="search" id="searchInput" placeholder="Buscar productos, marcas..." autocomplete="off" />
+      <button class="chip-filter active" data-filter="all">Todo</button>
+      <button class="chip-filter" data-filter="oferta">Ofertas</button>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <!-- VISTA: LOGIN -->
+    <section id="view-login" class="view">
+      <div class="login-hero" id="loginHero">
+        <div class="hero-bubbles" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <div class="login-logo"><img src="img/Logo_Tottus-blanco.png" class="main-logo" alt="Tottus" /></div>
+        <div class="login-pill">SCAN &amp; GO · DEMO</div>
+        <h1>Compra sin colas</h1>
+        <p class="hero-desc">Escanea y paga desde tu celular. Sin colas.</p>
+        <div class="hero-steps">
+          <div>📷<b>Escanea</b></div>
+          <div>💳<b>Paga</b></div>
+          <div>🛡️<b>Valida y sal</b></div>
+        </div>
+        <div class="hero-auth">
+          <button type="button" id="btnGoogleAccess" class="btn-google-circle" aria-label="Continuar con Google (función próximamente)"><i class="fa-brands fa-google" aria-hidden="true"></i></button>
+          <button type="button" class="hero-btn hero-btn-primary" id="btnGoLogin" aria-expanded="false" aria-controls="loginCard">Iniciar sesión</button>
+          <button type="button" class="hero-btn hero-btn-tertiary" id="btnDemo">Ver demostración</button>
+        </div>
+      </div>
+      <div id="loginCard" class="card auth-card" hidden aria-hidden="true">
+        <h2>Iniciar sesión</h2>
+        <p class="muted small">Ingresa con tu cuenta para continuar con Scan &amp; Go</p>
+        <p class="muted small">Inicia sesión con tu correo y contraseña</p>
+        <form id="emailLoginForm" novalidate>
+          <label for="authEmail">
+            Correo electrónico
+            <input type="email" id="authEmail" placeholder="tucorreo@mail.com" required autocomplete="email" />
+          </label>
+          <p class="field-error" id="authEmailError" hidden aria-live="polite"></p>
+          <label for="authPass">
+            Contraseña
+            <span class="pass-wrap">
+              <input type="password" id="authPass" placeholder="Tu contraseña" required autocomplete="current-password" />
+              <button type="button" class="pass-toggle" id="btnToggleAuthPass" aria-label="Ver contraseña">👁️</button>
+            </span>
+          </label>
+          <p class="field-error" id="authPassError" hidden aria-live="polite"></p>
+          <div class="auth-links">
+            <button type="button" class="link-btn" id="btnForgotPass">¿Olvidaste tu contraseña?</button>
+          </div>
+          <p class="form-status" id="authStatus" hidden aria-live="polite"></p>
+          <button type="submit" class="btn-primary">Ingresar</button>
+          <button type="button" class="btn-ghost" id="btnBackToWelcome">Volver</button>
+          <p class="muted small auth-switch">¿No tienes una cuenta? <button type="button" class="link-btn" id="btnGoRegisterFromLogin">Crear cuenta</button></p>
+        </form>
+      </div>
+      <form id="loginForm" class="card login-card" autocomplete="on" hidden aria-hidden="true" novalidate>
+        <h2>Crear cuenta</h2>
+        <p class="muted small">Crea tu cuenta para comprar sin colas</p>
+        <label for="loginName">
+          Nombre y apellido
+          <input type="text" id="loginName" placeholder="Ej: María Quispe" required minlength="3" autocomplete="name" />
+        </label>
+        <p class="field-error" id="loginNameError" hidden aria-live="polite"></p>
+        <label for="loginEmail">
+          Correo electrónico
+          <input type="email" id="loginEmail" placeholder="tucorreo@mail.com" required autocomplete="email" />
+        </label>
+        <p class="field-error" id="loginEmailError" hidden aria-live="polite"></p>
+        <label for="loginPass">
+          Contraseña
+          <span class="pass-wrap">
+            <input type="password" id="loginPass" placeholder="••••••••" required minlength="4" autocomplete="new-password" />
+            <button type="button" class="pass-toggle" id="btnTogglePass" aria-label="Ver contraseña">👁️</button>
+          </span>
+        </label>
+        <p class="field-error" id="loginPassError" hidden aria-live="polite"></p>
+        <label for="loginPassConfirm">
+          Confirmar contraseña
+          <span class="pass-wrap">
+            <input type="password" id="loginPassConfirm" placeholder="••••••••" required minlength="4" autocomplete="new-password" />
+            <button type="button" class="pass-toggle" id="btnTogglePassConfirm" aria-label="Ver confirmación de contraseña">👁️</button>
+          </span>
+        </label>
+        <p class="field-error" id="loginPassConfirmError" hidden aria-live="polite"></p>
+        <label for="loginDNI">
+          DNI (8 dígitos)
+          <input type="text" id="loginDNI" placeholder="Ej: 12345678" required inputmode="numeric" maxlength="8" pattern="\d{8}" autocomplete="off" />
+        </label>
+        <p class="field-error" id="loginDNIError" hidden aria-live="polite"></p>
+        <label for="loginBirth">
+          Fecha de nacimiento
+          <input type="date" id="loginBirth" required autocomplete="bday" />
+        </label>
+        <p class="field-error" id="loginBirthError" hidden aria-live="polite"></p>
+        <p class="muted small">🔞 RN02: licores solo +18 años. Se valida con tu fecha de nacimiento.</p>
+        <p class="form-status" id="registerError" hidden aria-live="polite"></p>
+        <p class="form-success" id="registerSuccess" hidden aria-live="polite"></p>
+        <button type="submit" class="btn-primary">Crear cuenta</button>
+        <button type="button" class="btn-ghost" id="btnBackToWelcomeReg">Volver</button>
+        <p class="muted small auth-switch">¿Ya tienes una cuenta? <button type="button" class="link-btn" id="btnGoLoginFromRegister">Iniciar sesión</button></p>
+      </form>
+    </section>
+
+    <!-- VISTA: HOME / CATALOGO -->
+    <section id="view-home" class="view" hidden>
+      <div class="promo-banner">
+        <div class="promo-ticker">🔥 OFERTAS TOTTUS · HASTA 40% DSCTO · 🔥 OFERTAS TOTTUS · HASTA 40% DSCTO ·</div>
+        <div class="promo-main">
+          <div>
+            <strong>🌿 Semana Verde de ofertas</strong>
+            <p>Precios ya incluyen IGV · Solo en la app</p>
+          </div>
+          <button class="btn-small" id="btnVerOfertas">Ver ofertas</button>
+        </div>
+      </div>
+
+      <div class="steps-mini">
+        <div class="step-mini done">1 📷 Escanea</div>
+        <div class="step-mini">2 🛒 Carrito</div>
+        <div class="step-mini">3 💳 Paga</div>
+        <div class="step-mini">4 🛡️ Sal</div>
+      </div>
+
+      <div class="scan-cta card">
+        <div>
+          <strong>¿Estás en tienda? ⚡</strong>
+          <p class="muted">Escanea el código de barras y súmalo al carrito al instante.</p>
+        </div>
+        <button class="btn-scan pulse-ring" id="btnOpenScanner">📷<span>Escanear</span></button>
+      </div>
+
+      <h2 class="section-title">Catálogo <span id="productCount"></span></h2>
+      <div id="productGrid" class="product-grid"></div>
+    </section>
+
+    <!-- VISTA: SCANNER -->
+    <section id="view-scanner" class="view" hidden>
+      <div class="card scanner-card">
+        <h2>Lector de código de barras</h2>
+        <div id="reader" hidden style="width: 100%; max-width: 400px; margin: auto;"></div>
+        <p class="muted small scanner-idle-hint" id="scannerIdleHint">La cámara está desactivada. Presiona Activar cámara para comenzar.</p>
+        <p class="muted small scan-align-hint" id="scanAlignHint" hidden>Alinea todas las barras dentro del rectángulo</p>
+        <div class="scanner-viewport">
+          <p id="scannerStatus" class="scanner-status">Cámara lista. Mantén el código horizontal y estable.</p>
+        </div>
+        <div class="scanner-actions">
+          <button class="btn-primary" id="btnStartCamera">Activar cámara</button>
+          <button class="btn-ghost" id="btnStopCamera">Detener</button>
+        </div>
+        <div class="manual-scan">
+          <label>Código manual / simulado
+            <div class="manual-row">
+              <input type="text" id="manualCode" inputmode="numeric" placeholder="Ej: 7750123450013" />
+              <button class="btn-dark" id="btnManualAdd">Agregar</button>
+            </div>
+          </label>
+          <details class="codes-help">
+            <summary>Ver códigos de prueba</summary>
+            <div id="codesList" class="codes-list"></div>
+          </details>
+          <p id="scanResult" class="scan-result"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- VISTA: CARRITO -->
+    <section id="view-cart" class="view" hidden>
+      <h2 class="section-title">🛒 Mi carrito <span id="cartCountLabel"></span></h2>
+      <p class="muted small">Máximo permitido: <strong>40 productos</strong> por compra rápida 🧺. Más de 40 pasa por caja tradicional.</p>
+      <div class="progress-wrap">
+        <div class="progress-bar"><div id="cartProgress"></div></div>
+        <small id="cartProgressLabel">0 / 40</small>
+      </div>
+      <div id="cartList" class="cart-list"></div>
+
+      <div class="card totals-card">
+        <h3>Resumen de compra</h3>
+        <div class="totals-row"><span>Subtotal (sin IGV)</span><span id="subtotalEl">S/ 0.00</span></div>
+        <div class="totals-row"><span>IGV (18%)</span><span id="igvEl">S/ 0.00</span></div>
+        <div class="totals-row discount"><span>Ahorro por ofertas</span><span id="savingEl">− S/ 0.00</span></div>
+        <div class="totals-row total"><span>Total a pagar</span><span id="totalEl">S/ 0.00</span></div>
+        <p class="muted small">En Perú los precios en góndola ya incluyen IGV. Aquí se muestra el desglose: Subtotal = Total / 1.18.</p>
+        <button class="btn-primary" id="btnCheckout">Finalizar compra →</button>
+        <button class="btn-ghost danger" id="btnClearCart">Vaciar carrito</button>
+      </div>
+
+      <div id="ticketCard" class="card ticket" hidden>
+        <h3>🧾 Boleta / Ticket Scan & Go</h3>
+        <div id="ticketBody"></div>
+        <button class="btn-primary" id="btnGoToPay">Pagar desde el celular →</button>
+        <button class="btn-ghost" id="btnPrintTicket">🖨️ Imprimir / PDF</button>
+        <button class="btn-ghost" id="btnCloseTicket">Seguir comprando</button>
+      </div>
+      <div class="card" id="historyCard">
+        <h3>📜 Historial de compras</h3>
+        <div id="historyList" class="hist-list"></div>
+        <button class="btn-ghost" id="btnClearHistory">Borrar historial</button>
+      </div>
+    </section>
+
+    <!-- VISTA: PAGO + QR + VALIDACIONES -->
+    <section id="view-checkout" class="view" hidden>
+      <h2 class="section-title">💳 Pago y retiro</h2>
+      <div class="checkout-progress">
+        <div class="cp-step" id="cp1">1💳<span>Pago</span></div>
+        <div class="cp-line"></div>
+        <div class="cp-step" id="cp2">2🏪<span>Caja</span></div>
+        <div class="cp-line"></div>
+        <div class="cp-step" id="cp3">3🛡️<span>Salida</span></div>
+        <div class="cp-line"></div>
+        <div class="cp-step" id="cp4">4✅<span>Listo</span></div>
+      </div>
+
+      <!-- Paso 1: pagar -->
+      <div class="card" id="payStep1">
+        <h3>1️⃣ Paga desde tu celular</h3>
+        <p class="muted small">Total a pagar: <strong id="payTotalLabel">S/ 0.00</strong> <span id="payItemsLabel"></span></p>
+        <p class="muted small perf-hint" id="payTimerHint"></p>
+        <div class="pay-methods">
+          <label class="pay-opt"><input type="radio" name="payMethod" value="Yape" checked /> 💜 Yape</label>
+          <label class="pay-opt"><input type="radio" name="payMethod" value="Plin" /> 🩵 Plin</label>
+          <label class="pay-opt"><input type="radio" name="payMethod" value="Tarjeta" /> 💳 Tarjeta</label>
+        </div>
+        <div class="card-form" id="cardForm" hidden>
+          <label>Número (demo 16 dígitos)
+            <input type="text" id="cardNumber" inputmode="numeric" maxlength="19" placeholder="4111 1111 1111 1111" />
+          </label>
+          <div class="row2">
+            <label>Vence MM/AA
+              <input type="text" id="cardExp" maxlength="5" placeholder="12/28" />
+            </label>
+            <label>CVV
+              <input type="password" id="cardCvv" inputmode="numeric" maxlength="3" placeholder="123" />
+            </label>
+          </div>
+          <p class="muted small">Demo académica: no se cobra real, solo se valida formato.</p>
+        </div>
+        <button class="btn-primary" id="btnPayNow">Pagar ahora</button>
+        <p class="muted small">Pago simulado (demo). En producción aquí se conecta a la pasarela real.</p>
+      </div>
+
+      <!-- Paso 2: QR caja -->
+      <div class="card qr-card qr-caja" id="payStep2" hidden>
+        <div class="qr-flag">🏪 INTERFAZ CAJA</div>
+        <h3>2️⃣ Confirma en Caja</h3>
+        <p class="muted small">Acércate a caja y muestra este QR. Caduca en <strong id="qrCajaTimer">05:00</strong> para evitar capturas reutilizadas.</p>
+        <p class="qr-secure-note">🔒 <b>Tu seguridad:</b> este QR es <b>de un solo uso</b>, caduca en 5 minutos y se anula si regeneras uno nuevo. No lo compartas ni permitas que le tomen captura: Tottus lo invalida automáticamente.</p>
+        <div class="qr-box">
+          <canvas id="qrCajaCanvas"></canvas>
+          <div class="qr-code-text">Código caja: <strong id="qrCajaCode">------</strong></div>
+          <div class="qr-status" id="qrCajaStatus">QR vigente</div>
+        </div>
+        <div class="row2">
+          <button class="btn-dark" id="btnRegenCaja">↻ Regenerar QR</button>
+          <button class="btn-primary" id="btnValidateCaja">✅ Validar en Caja (demo)</button>
+        </div>
+        <details class="codes-help">
+          <summary>¿Eres cajero? Validación manual</summary>
+          <div class="manual-row">
+            <input id="cajaInput" inputmode="numeric" placeholder="Código de 6 dígitos" maxlength="6" />
+            <button class="btn-dark" id="btnCajaManual">Confirmar</button>
+          </div>
+        </details>
+      </div>
+
+      <!-- Paso 3: QR seguridad -->
+      <div class="card qr-card qr-seg" id="payStep3" hidden>
+        <div class="qr-flag">🛡️ INTERFAZ SEGURIDAD</div>
+        <h3>3️⃣ Confirma tu salida con Seguridad</h3>
+        <p class="muted small">Tras validar en caja se genera tu pase de salida. Caduca en <strong id="qrSalidaTimer">03:00</strong>.</p>
+        <p class="qr-secure-note">🔒 Este pase es <b>distinto</b> al QR de caja, caduca en 3 minutos y solo sirve una vez. Muéstralo únicamente al personal de seguridad Tottus.</p>
+        <div class="qr-box">
+          <canvas id="qrSalidaCanvas"></canvas>
+          <div class="qr-code-text">Código salida: <strong id="qrSalidaCode">------</strong></div>
+          <div class="qr-status" id="qrSalidaStatus">Pase vigente</div>
+        </div>
+        <div class="row2">
+          <button class="btn-dark" id="btnRegenSalida">↻ Regenerar pase</button>
+          <button class="btn-primary" id="btnValidateSalida">🛡️ Validar salida (demo)</button>
+        </div>
+        <details class="codes-help">
+          <summary>¿Eres seguridad? Validación manual</summary>
+          <div class="manual-row">
+            <input id="segInput" inputmode="numeric" placeholder="Código de 6 dígitos" maxlength="6" />
+            <button class="btn-dark" id="btnSegManual">Autorizar salida</button>
+          </div>
+        </details>
+      </div>
+
+      <!-- Paso 4: final -->
+      <div class="card ticket" id="payStep4" hidden>
+        <h3>🎊 ¡Felicidades por tu compra!</h3>
+        <div id="finalTicketBody"></div>
+        <button class="btn-ghost" id="btnPrintFinal">🖨️ Imprimir / PDF</button>
+        <button class="btn-primary" id="btnNewPurchase">Iniciar nueva compra</button>
+      </div>
+    </section>
+
+    <!-- VISTA: CHAT CON TOBI (paso 2, solo aditivo) -->
+    <section id="view-tobi" class="view" hidden>
+      <div class="card tobi-chat-card">
+        <div class="tobi-chat-head">
+          <button class="btn-ghost tobi-chat-back" id="btnTobiBack" type="button" aria-label="Volver a la tienda">← Volver</button>
+          <div class="tobi-chat-title">
+            <span class="tobi-chat-avatar" aria-hidden="true">T</span>
+            <div>
+              <strong>Tobi</strong>
+              <small class="muted">Asistente Tottus · en línea</small>
+            </div>
+          </div>
+          <button class="btn-ghost tobi-history-toggle" id="btnTobiHistory" type="button" aria-label="Ver historial de conversaciones">🕘 Historial</button>
+          <button class="btn-ghost tobi-allergy-toggle" id="btnTobiAllergies" type="button" aria-label="Ver mis alergias">🛡️ Mis alergias</button>
+          <button class="btn-ghost tobi-allergy-toggle" id="btnTobiFrequents" type="button" aria-label="Ver mis productos frecuentes">🛒 Mis productos</button>
+          <button class="btn-ghost tobi-allergy-toggle" id="btnTobiRecipes" type="button" aria-label="Ver recetas saludables">🍲 Recetas</button>
+          <button class="btn-ghost tobi-allergy-toggle" id="btnTobiDiscounts" type="button" aria-label="Ver descuentos de hoy">🏷️ Ofertas</button>
+          <button class="btn-ghost tobi-allergy-toggle" id="btnTobiShopping" type="button" aria-label="Ver mi lista de compras">🧾 Mi lista</button>
+        </div>
+        <div id="tobiHistoryPanel" class="tobi-history-panel" hidden>
+          <div class="tobi-history-actions">
+            <button class="btn-dark tobi-history-new" id="btnTobiNew" type="button">+ Nueva conversación</button>
+            <button class="btn-ghost tobi-history-clear" id="btnTobiClearAll" type="button">Borrar todo</button>
+          </div>
+          <p id="tobiHistoryWarn" class="muted small" hidden>⚠️ No se pudo guardar en este navegador; el chat sigue funcionando sin guardar.</p>
+          <div id="tobiHistoryList" class="tobi-history-list"></div>
+          <p id="tobiHistoryEmpty" class="muted small">Aún no tienes conversaciones. ¡Empieza una nueva! 💬</p>
+        </div>
+        <div id="tobiAllergyPanel" class="tobi-allergy-panel" hidden>
+          <div class="tobi-history-actions">
+            <button class="btn-ghost tobi-history-clear" id="btnTobiAllergyBack" type="button">← Volver al chat</button>
+            <button class="btn-ghost tobi-history-clear" id="btnTobiAllergyClear" type="button">Borrar todas</button>
+          </div>
+          <p id="tobiAllergyWarn" class="muted small" hidden>⚠️ No se pudo guardar en este navegador; el registro sigue funcionando sin guardar.</p>
+          <p id="tobiAllergyNone" class="muted small" hidden>Declaraste no tener alergias. Si eso cambia, agrégalas aquí. 💚</p>
+          <div class="tobi-allergy-addrow">
+            <input type="text" id="tobiAllergyInput" placeholder="Ej: maní" maxlength="40" aria-label="Nueva alergia" autocomplete="off" />
+            <button class="btn-dark tobi-history-new" id="btnTobiAllergyAdd" type="button">Agregar</button>
+          </div>
+          <div id="tobiAllergyList" class="tobi-history-list"></div>
+          <p id="tobiAllergyEmpty" class="muted small">Aún no registraste alergias.</p>
+        </div>
+        <div id="tobiFrequentPanel" class="tobi-allergy-panel" hidden>
+          <div class="tobi-history-actions">
+            <button class="btn-ghost tobi-history-clear" id="btnTobiFrequentBack" type="button">← Volver al chat</button>
+            <button class="btn-ghost tobi-history-clear" id="btnTobiFrequentClear" type="button">Borrar todos</button>
+          </div>
+          <p id="tobiFrequentWarn" class="muted small" hidden>⚠️ No se pudo guardar en este navegador; el registro sigue funcionando sin guardar.</p>
+          <div class="tobi-allergy-addrow">
+            <input type="text" id="tobiFrequentInput" placeholder="Ej: leche" maxlength="40" aria-label="Nuevo producto frecuente" autocomplete="off" />
+            <button class="btn-dark tobi-history-new" id="btnTobiFrequentAdd" type="button">Agregar</button>
+          </div>
+          <div id="tobiFrequentList" class="tobi-history-list"></div>
+          <p id="tobiFrequentEmpty" class="muted small">Aún no registraste productos.</p>
+        </div>
+        <div id="tobiRecipePanel" class="tobi-allergy-panel" hidden>
+          <div class="tobi-history-actions">
+            <button class="btn-ghost tobi-history-clear" id="btnTobiRecipeBack" type="button">← Volver al chat</button>
+          </div>
+          <p id="tobiRecipeExcluded" class="tobi-recipe-excluded"></p>
+          <p id="tobiRecipeUnverified" class="muted small" hidden></p>
+          <div id="tobiRecipeList" class="tobi-recipe-feed"></div>
+          <div id="tobiRecipeDetail" class="tobi-recipe-detail" hidden></div>
+          <p id="tobiRecipeEmpty" class="muted small">No encontré recetas seguras con tus datos.</p>
+          <p class="tobi-recipe-disclaimer">⚠️ Verifica siempre las etiquetas de los productos. Estas sugerencias no reemplazan la opinión de un médico o nutricionista.</p>
+        </div>
+        <div id="tobiDiscountPanel" class="tobi-allergy-panel" hidden>
+          <div class="tobi-history-actions">
+            <button class="btn-ghost tobi-history-clear" id="btnTobiDiscountBack" type="button">← Volver al chat</button>
+          </div>
+          <div id="tobiDiscountList" class="tobi-recipe-feed"></div>
+          <p id="tobiDiscountEmpty" class="muted small">Hoy no hay descuentos disponibles.</p>
+          <p class="muted small">Las ofertas pueden cambiar. Verifica el precio final en la app o en caja.</p>
+        </div>
+        <div id="tobiShoppingPanel" class="tobi-allergy-panel" hidden>
+          <div class="tobi-history-actions">
+            <button class="btn-ghost tobi-history-clear" id="btnTobiShoppingBack" type="button">← Volver al chat</button>
+            <button class="btn-ghost tobi-history-clear" id="btnTobiShoppingClear" type="button">Vaciar lista</button>
+          </div>
+          <div id="tobiShoppingList" class="tobi-history-list"></div>
+          <p id="tobiShoppingEmpty" class="muted small">Tu lista está vacía. Ármala desde una receta. 🧾</p>
+          <p class="muted small">Verifica siempre las etiquetas de los productos.</p>
+        </div>
+        <div id="tobiChatLog" class="tobi-chat-log" role="log" aria-live="polite" aria-label="Conversación con Tobi"></div>
+        <div id="tobiTyping" class="tobi-typing" hidden><span></span><span></span><span></span><em>Tobi está escribiendo...</em></div>
+        <div id="tobiSuggest" class="tobi-suggest" hidden></div>
+        <form id="tobiChatForm" class="tobi-chat-form" autocomplete="off">
+          <input type="text" id="tobiChatInput" placeholder="Escribe tu duda..." maxlength="500" aria-label="Escribe tu mensaje a Tobi" />
+          <button type="submit" class="btn-primary tobi-chat-send" aria-label="Enviar mensaje">Enviar</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- BOTTOM NAV (mobile) -->
+  <nav class="bottom-nav" id="bottomNav" hidden>
+    <button data-nav="home" class="active">🏠<span>Tienda</span></button>
+    <button data-nav="scanner" class="nav-scan">📷<span>Escanear</span></button>
+    <button data-nav="cart">🛒<span>Carrito</span></button>
+    <button data-nav="checkout">💳<span>Pagar</span></button>
+    <button data-nav="logout">👤<span>Salir</span></button>
+  </nav>
+
+  <div id="toast" class="toast"></div>
+
+  <!-- RN-CAJA-RÁPIDA: modal bloqueante de tope 40 -->
+  <div id="fastLimitModal" class="modal-overlay" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fastLimitTitle">
+      <h3 id="fastLimitTitle">⚠️ Compra rápida</h3>
+      <p>Límite de compras rápidas alcanzado (40 artículos). Dirígete a una caja tradicional para procesar esta compra.</p>
+      <button class="btn-primary" id="btnCloseFastModal">Entendido</button>
+    </div>
+  </div>
+
+  <!-- AVISO PROPIO DE SCAN & GO: acceso con Google próximamente.
+       Modal nativo de la app (no imita el selector oficial de Google, no pide
+       correo, contraseña ni nombre, y no crea ninguna cuenta). -->
+  <div id="googleModal" class="modal-overlay" hidden>
+    <div class="modal-card google-modal-card" role="dialog" aria-modal="true" aria-labelledby="googleModalTitle" aria-describedby="googleModalDesc">
+      <button type="button" class="modal-close" id="btnCloseGoogleModal" aria-label="Cerrar aviso de Google">✕</button>
+      <h3 id="googleModalTitle">Acceso con Google próximamente</h3>
+      <p id="googleModalDesc">El backend ya está preparado para validar cuentas de Google. Esta opción se habilitará cuando se configuren las credenciales oficiales. Por ahora, inicia sesión con tu correo y contraseña.</p>
+      <button class="btn-primary" id="btnGoogleModalOk">Entendido</button>
+    </div>
+  </div>
+
+  <!-- TOBI: robot guía de Tottus -->
+  <div class="bot-widget" id="botWidget">
+    <div class="bot-bubble" id="botBubble" hidden>
+      <p id="botText"></p>
+      <button class="btn-primary tobi-chat-open" id="btnTobiChat" type="button">💬 Chatear con Tobi</button>
+      <button class="bot-close" id="botClose" aria-label="Cerrar mensaje">✕</button>
+    </div>
+    <button class="bot-avatar" id="botAvatar" aria-label="Tobi, tu asistente Tottus">
+      <span class="bot-antenna"></span>
+      <span class="bot-head">
+        <span class="bot-eye bot-eye-l"></span>
+        <span class="bot-eye bot-eye-r"></span>
+        <span class="bot-smile"></span>
+      </span>
+      <span class="bot-body"><i>T</i></span>
+      <span class="tobi-greet-arm" aria-hidden="true"></span>
+      <span class="bot-name">TOBI</span>
+    </button>
+  </div>
+
+  <!-- Confeti de celebración -->
+  <canvas id="confettiCanvas"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script id="quagga2-cdn" src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js" onerror="window.__quaggaCdnFailed=true"></script>
+  <script src="app.js"></script>
+  <script src="tobi-allergens.js"></script>
+  <script src="tobi-discounts.js"></script>
+  <script src="tobi-recipes.js"></script>
+  <script src="tobi-profile.js"></script>
+  <script src="tobi-history.js"></script>
+  <script src="tobi-chat.js"></script>
+</body>
+</html>
