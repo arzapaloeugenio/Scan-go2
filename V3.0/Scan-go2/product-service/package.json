@@ -1,0 +1,17 @@
+{
+  "name": "product-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servicio de solo lectura del catalogo y descuentos de Scan & Go 2.",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "18.0.7",
+    "express": "5.3.0",
+    "pg": "8.23.1"
+  }
+}
