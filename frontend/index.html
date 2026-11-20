@@ -472,7 +472,14 @@
   <!-- Confeti de celebración -->
   <canvas id="confettiCanvas"></canvas>
 
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <!-- qrcode@1.5.3: el paquete npm no publica build/qrcode.min.js (jsDelivr
+       responde 404), por eso antes no existía window.QRCode y se dibujaba un
+       patrón falso. Se usa el bundle ESM oficial de ESA MISMA versión y se
+       expone como global; es una sola librería QR, sin duplicados. -->
+  <script type="module">
+    import QRCode from "https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm";
+    window.QRCode = QRCode;
+  </script>
   <script id="quagga2-cdn" src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js" onerror="window.__quaggaCdnFailed=true"></script>
   <script src="app.js"></script>
   <script src="tobi-allergens.js"></script>

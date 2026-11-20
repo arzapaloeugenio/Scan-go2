@@ -487,8 +487,22 @@ body.access-mode { padding-bottom: 0 !important; }
 }
 .qr-seg .qr-flag { background: var(--green); }
 .qr-box { background: #fff; border: 1px dashed var(--border); border-radius: 14px; padding: 12px; margin: 10px 0; display: grid; place-items: center; gap: 8px; min-width: 0; }
-.qr-box canvas { width: 200px !important; height: 200px !important; max-width: 100%; background: #fff; border-radius: 10px; border: 1px solid var(--border); }
-.qr-box canvas.expired { filter: grayscale(1); opacity: .4; }
+/* QR real generado por qrcode@1.5.3: cuadrado, centrado, fondo blanco y
+   escala uniforme. Sin filtros ni opacidad que interfieran con la lectura. */
+.qr-box canvas {
+  display: block;
+  width: 100%;
+  max-width: 200px;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  image-rendering: pixelated;
+}
+/* Expirado se marca con el borde y el estado de texto, sin tocar la matriz. */
+.qr-box canvas.expired { border-color: #b71c1c; }
 .qr-code-text { font-size: 15px; }
 .qr-status { font-size: 13px; font-weight: 900; color: var(--green-dark); background: var(--green-soft); border-radius: 999px; padding: 5px 12px; }
 .qr-status.bad { color: #fff; background: var(--green-deep); }

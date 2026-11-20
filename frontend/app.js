@@ -1635,26 +1635,68 @@ function buildPayload(ticketId, kind, total, code, token, exp) {
   return `${base}|${simpleHash(base + QR_SECRET)}`;
 }
 
-function drawQR(canvasId, text) {
-  const canvas = $(canvasId);
-  const ctx = canvas.getContext("2d");
-  canvas.classList.remove("expired");
-  if (window.QRCode?.toCanvas) {
-    window.QRCode.toCanvas(canvas, text, { width: 200, margin: 1 }, (err) => {
-      if (err) fallbackQR(canvas, text);
-    });
-  } else fallbackQR(canvas, text);
-}
-// Reserva sin internet: dibuja patrón + token (no escaneable real, solo demo).
-function fallbackQR(canvas, text) {
-  const ctx = canvas.getContext("2d");
-  canvas.width = 200; canvas.height = 200;
-  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 200, 200);
-  ctx.fillStyle = "#000";
-  let s = 0; for (const c of text) s += c.charCodeAt(0);
-  for (let y = 0; y < 20; y++) for (let x = 0; x < 20; x++) {
-    if ((x * 31 + y * 17 + s) % 3 === 0) ctx.fillRect(10 + x * 9, 10 + y * 9, 8, 8);
+// ---------- QR REAL (qrcode@1.5.3, ya cargado en index.html) ----------
+// Un solo renderizador para los dos QR. Cada canvas tiene su propio estado
+// (WeakMap): regenerar la caja nunca altera el pase de salida ni al revés.
+const QR_RENDER_OPTIONS = {
+  width: 200,
+  margin: 4,
+  errorCorrectionLevel: "M",
+  color: { dark: "#000000", light: "#ffffff" },
+};
+const qrRenderState = new WeakMap();
+
+function getQrRenderState(canvas) {
+  let state = qrRenderState.get(canvas);
+  if (!state) {
+    state = { seq: 0, chain: Promise.resolve() };
+    qrRenderState.set(canvas, state);
   }
+  return state;
+}
+
+// Código nuevo de 6 dígitos, distinto del anterior y del del otro pase.
+function genNuevoCodigo6(...codigosPrevios) {
+  const usados = codigosPrevios.filter((c) => /^\d{6}$/.test(String(c))).map(String);
+  let code = genCode6();
+  while (usados.includes(code)) code = genCode6();
+  return code;
+}
+
+async function renderRealQr(canvas, value) {
+  const code = String(value == null ? "" : value);
+  if (!canvas || typeof canvas.getContext !== "function") {
+    console.error("No se pudo generar el QR: el canvas no existe o no es válido.");
+    return false;
+  }
+  if (!/^\d{6}$/.test(code)) {
+    console.error("No se pudo generar el QR: el código debe tener exactamente 6 dígitos.", value);
+    return false;
+  }
+  if (!window.QRCode || typeof window.QRCode.toCanvas !== "function") {
+    console.error("No se pudo generar el QR: la librería QRCode no está disponible.");
+    return false;
+  }
+  const state = getQrRenderState(canvas);
+  const seq = ++state.seq;
+  // Cola por canvas: con regeneraciones rápidas solo se pinta la última
+  // versión; las anteriores se descartan sin sobrescribir el canvas.
+  const tarea = state.chain.then(async () => {
+    if (state.seq !== seq) return false;
+    const ctx = canvas.getContext("2d");
+    if (ctx && typeof ctx.clearRect === "function") {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    // qrcode@1.5.3 dibuja la matriz real (con los 3 patrones de
+    // posicionamiento) en el canvas: sin CSS, divs ni patrones simulados.
+    await window.QRCode.toCanvas(canvas, code, QR_RENDER_OPTIONS);
+    return state.seq === seq;
+  }).catch((err) => {
+    console.error("No se pudo generar el QR real:", err);
+    return false;
+  });
+  state.chain = tarea.catch(() => false); // la cadena nunca queda rechazada
+  return tarea;
 }
 
 function fmtTimer(sec) {
@@ -1729,12 +1771,12 @@ function restoreOrderUI() {
   $("payStep4").hidden = true;
   if (order.status === "PAGADO_PENDIENTE_CAJA" && order.caja) {
     $("qrCajaCode").textContent = order.caja.code;
-    drawQR("qrCajaCanvas", buildPayload(order.ticketId, "CAJA", order.total, order.caja.code, order.caja.token, order.caja.exp));
+    renderRealQr($("qrCajaCanvas"), order.caja.code);
     setCheckoutStep(2);
     startQrTimer();
   } else if (order.status === "VALIDADO_CAJA" && order.salida) {
     $("qrSalidaCode").textContent = order.salida.code;
-    drawQR("qrSalidaCanvas", buildPayload(order.ticketId, "SALIDA", order.total, order.salida.code, order.salida.token, order.salida.exp));
+    renderRealQr($("qrSalidaCanvas"), order.salida.code);
     setCheckoutStep(3);
     startQrTimer();
   }
@@ -1942,20 +1984,24 @@ async function payNow() {
 
 function issueCajaQR() {
   const exp = Date.now() + QR_CAJA_TTL_SEC * 1000;
-  order.caja = { code: genCode6(), token: genToken(), exp, used: false };
+  const codigoAnterior = order.caja && order.caja.code;
+  order.caja = { code: genNuevoCodigo6(codigoAnterior), token: genToken(), exp, used: false };
   order.status = "PAGADO_PENDIENTE_CAJA";
   saveOrder();
   $("qrCajaCode").textContent = order.caja.code;
   $("qrCajaStatus").textContent = "QR vigente — muestra en caja";
   $("qrCajaStatus").classList.remove("bad");
-  drawQR("qrCajaCanvas", buildPayload(order.ticketId, "CAJA", order.total, order.caja.code, order.caja.token, exp));
+  $("qrCajaCanvas").classList.remove("expired");
+  renderRealQr($("qrCajaCanvas"), order.caja.code);
   startQrTimer();
   botSay(`🔒 <b>Sobre tu QR</b>: muestra este código <b>solo en la caja</b>. Es de <b>un solo uso</b> y caduca en <b>5 minutos</b>; si lo regeneras, el anterior queda anulado al instante. Así nadie puede robarte con una captura de pantalla 😉`, 16000);
 }
 
 function issueSalidaQR() {
   const exp = Date.now() + QR_SALIDA_TTL_SEC * 1000;
-  order.salida = { code: genCode6(), token: genToken(), exp, used: false };
+  const codigoAnterior = order.salida && order.salida.code;
+  const codigoCaja = order.caja && order.caja.code;
+  order.salida = { code: genNuevoCodigo6(codigoAnterior, codigoCaja), token: genToken(), exp, used: false };
   order.status = "VALIDADO_CAJA";
   saveOrder();
   $("payStep2").hidden = true;
@@ -1964,7 +2010,8 @@ function issueSalidaQR() {
   $("qrSalidaCode").textContent = order.salida.code;
   $("qrSalidaStatus").textContent = "Pase vigente — muestra en seguridad";
   $("qrSalidaStatus").classList.remove("bad");
-  drawQR("qrSalidaCanvas", buildPayload(order.ticketId, "SALIDA", order.total, order.salida.code, order.salida.token, exp));
+  $("qrSalidaCanvas").classList.remove("expired");
+  renderRealQr($("qrSalidaCanvas"), order.salida.code);
   startQrTimer();
   botSay(`🛡️ Último paso, ${firstName()}: muestra este <b>pase de salida</b> al personal de seguridad de la puerta. También caduca (3 min) y es de un solo uso. ¡Casi listo!`);
 }

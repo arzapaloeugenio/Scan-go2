@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Instalación reproducible; las dependencias de desarrollo no son necesarias.
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
 
 # Solo el código necesario en tiempo de ejecución.
 COPY config ./config
