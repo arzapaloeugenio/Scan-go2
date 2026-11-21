@@ -51,6 +51,8 @@ const PRODUCTOS_LOCALES = [
   { id: 12, name: "Papel Higiénico 24 rollos", brand: "Suave", price: 27.50, oldPrice: null, code: "7750123450129", image: "img/Suave.png", cat: "limpieza" },
   { id: 13, name: "Cerveza Cristal Six Pack 355ml", brand: "Cristal", price: 24.90, oldPrice: 29.90, code: "7750123450136", image: "img/CRISTAL-SIX-PACK-LATA.png", cat: "licores", restricted: true },
   { id: 14, name: "Vino Tinto Borgoña 750ml", brand: "Tabernero", price: 32.50, oldPrice: null, code: "7750123450143", image: "img/Tabernero.png", cat: "licores", restricted: true },
+  { id: 15, name: "Sublime Capuccino", brand: "Nestlé", price: 3.50, oldPrice: null, code: "8445292635882", image: "img/sublimecapuccino.png", cat: "golosinas", restricted: false },
+  { id: 16, name: "Galleta san jorge", brand: "San Jorge", price: 1.00, oldPrice: null, code: "7750106003094", image: "img/galleta-soda-san-jorge.png", cat: "golosinas", restricted: false },
 ];
 
 // Catálogo activo del frontend. Inicia con el respaldo local y, si la API
