@@ -73,7 +73,7 @@ tobi-profile.js → tobi-history.js → tobi-chat.js
 |---------|-----|-----------------|
 | `index.html` | Estructura + 6 vistas + nav inferior | header, search-bar, `#view-login/home/scanner/cart/checkout/tobi`, `#reader`, `#scannerStatus`, `#btnStartCamera/#btnStopCamera`, `#manualCode/#btnManualAdd`, `#codesList`, `#scanResult`, `loginDNI/loginBirth`, `#cardForm`, `#historyCard`, `#payTimerHint`, `#fastLimitModal`, `#qrCajaCanvas`, `#qrSalidaCanvas`, inputs `cajaInput/segInput`, panel `#botWidget` (`#btnTobiChat`), paneles del chat (`#tobiHistoryPanel`, `#tobiAllergyPanel`, `#tobiFrequentPanel`, `#tobiRecipePanel`, `#tobiDiscountPanel`, `#tobiShoppingPanel`, `#tobiSuggest`), `manifest.json` + `qrcode@1.5.3` + `#quagga2-cdn` (`https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js`) + `app.js` + 6 `tobi-*.js` |
 | `styles.css` | Diseño mobile-first verde/blanco | variables CSS, animaciones, `.restricted-tag`, `.perf-hint`, `.card-form`, `.hist-list`, `.modal-overlay/.modal-card` responsive, `.scanner-viewport/.scanner-status/.scanner-actions/.scan-result/.codes-list`, estado `:disabled` de botones del escáner, TOBI (`.tobi-greet`, `.tobi-nudge`, `.tobi-greet-arm`), burbujas del chat (`.chat-msg`), paneles (`.tobi-history-*`, `.tobi-recipe-*`), fila de sugerencias (`.tobi-suggest`), badge de alérgenos (`.tobi-allergen-badge`), confeti, `@media print` (solo ticket) |
-| `app.js` | Lógica de negocio | catálogo 14, `calcAge/isAdultUser`, `MAX_ITEMS=40`, `isFastLimitReached/showFastLimitModal`, `scanT0/payT0`, `claveCarritoActual/claveOrdenActual`, `identidadActiva`, `limpiarHistorialRemoto/limpiarBoletaVisible`, instrumentación temporal `[scan-perf]`, `saveOrder/restoreOrderUI`, `beep()`, escáner Quagga2 `isScannerLibAvailable/updateScannerAvailability/SCANNER_UNAVAILABLE_MSG/startCamera/stopCamera/onScanSuccess/handleQuaggaDetected/onScannedCode/renderCodesHelp` (`window._quaggaRunning`, `scannerRunning`, `window.__quaggaCdnFailed`, `window._quaggaDetectedBound`), validación tarjeta, checkout por pasos, TOBI (`botSay/botClose`, saludo `tobiGreetOnOpen` 2.6 s, saltito `tobiNudgeStart` cada 7 s + primer aviso 3.5 s hasta `_tobiPressedOnce`), confeti |
+| `app.js` | Lógica de negocio | catálogo 16 (14 base + 2 nuevos: Sublime Capuccino y Galleta san jorge), `calcAge/isAdultUser`, `MAX_ITEMS=40`, `isFastLimitReached/showFastLimitModal`, `scanT0/payT0`, `claveCarritoActual/claveOrdenActual`, `identidadActiva`, `limpiarHistorialRemoto/limpiarBoletaVisible`, instrumentación temporal `[scan-perf]`, `saveOrder/restoreOrderUI`, `beep()`, escáner Quagga2 `isScannerLibAvailable/updateScannerAvailability/SCANNER_UNAVAILABLE_MSG/startCamera/stopCamera/onScanSuccess/handleQuaggaDetected/onScannedCode/renderCodesHelp` (`window._quaggaRunning`, `scannerRunning`, `window.__quaggaCdnFailed`, `window._quaggaDetectedBound`), validación tarjeta, checkout por pasos, TOBI (`botSay/botClose`, saludo `tobiGreetOnOpen` 2.6 s, saltito `tobiNudgeStart` cada 7 s + primer aviso 3.5 s hasta `_tobiPressedOnce`), confeti |
 | `tobi-chat.js` | Chat propio (controlador + respuestas por reglas) | `getTobiReply(text)` + `getTobiReplyNamed(text, ctx)`, comprensión `tobiCleanText/tobiCanon/TOBI_TYPO_MAP/tobiFollowUp/tobiGuessChips/tobiSmartFallback`, `sendMsg/addMsg` (typing, scroll auto, Enter), historial UI, flujos alergias/frecuentes, intents recetas/descuentos, lista de compras, sugerencias (`renderTobiSuggest`, máx. 4) |
 | `tobi-history.js` | Historial del chat + nombre | `getUserName()` (`tottus_user` o “Cliente”), guardar/listar/abrir/borrar (`tobiHistory*`), saludo 1×/visita (`tobiGreetedThisVisit/tobiMarkGreeted`) |
 | `tobi-profile.js` | Perfil: alergias, frecuentes y lista de compras | `tobiProfile*` (alergias), `tobiFrequent*` + `tobiFrequentInCatalog()`, `tobiShopping*` (tope 50) |
@@ -94,7 +94,7 @@ tobi-profile.js → tobi-history.js → tobi-chat.js
 - Menor: header `(menor 🔞)` + bloqueo de licores; sesión persistente; “Salir” borra usuario, detiene cámara y timer QR.
 
 ### 4.2 Catálogo y ofertas (`renderProducts`, RN02)
-- 14 productos demo (12 base + 2 licores `restricted:true`: Cristal `...0136`, Borgoña `...0143`).
+- 16 productos de respaldo (14 base —12 normales + 2 licores `restricted:true`: Cristal `...0136`, Borgoña `...0143`— + 2 nuevos no restringidos: Sublime Capuccino `8445292635882` S/ 3.50 y Galleta san jorge `7750106003094` S/ 1.00). En la versión online el catálogo se carga desde `GET /api/products` (Neon vía Render); `PRODUCTOS_LOCALES` es solo fallback (ver §4.11).
 - `discount = round((1 - price/oldPrice)*100)`; etiqueta `-%` + badge `+18` (`.restricted-tag`) y nota `🔞 Venta solo mayores de 18`.
 - `addToCart()` bloquea licor si `!isAdultUser()` con toast RN02. Buscador + filtros `Todo / Ofertas`.
 
@@ -288,6 +288,17 @@ saving   = Σ((oldPrice - price) × qty)
 - **CORS:** la lista blanca sigue viniendo de variables de entorno; este cambio no la modifica. Para que Vercel funcione, el origen exacto del despliegue debe estar permitido en Render.
 - **Límite:** no hay separación por entorno (staging/producción) ni secreto en el frontend; cambiar de backend exige editar `index.html` y volver a desplegar.
 
+### 4.11 Catálogo online: dos productos nuevos y fuente de datos (2026-11-21)
+
+> Cambios de código **commiteados y subidos por el usuario** en `dd3568a` (`origin/main`); esta documentación se añade después y no está commiteada. Sin evidencia de ejecución del SQL en Neon. Vercel ya sirve las dos imágenes (200) tras el push; Render no respondió en la última consulta (timeout). `V3.0/` intacto.
+
+- **Flujo sin cambios:** `GET /api/products` (`backend/src/app.js`) → `productoController.listar` → `productoModel.listar` → `SELECT codigo_barras, nombre, precio, precio_antiguo, imagen, restringido FROM producto ORDER BY nombre`. El individual usa `WHERE codigo_barras = $1`. Tabla `producto`, `codigo_barras TEXT` PK; la API devuelve `codigoBarras`.
+- **Fuente de verdad online:** Neon (Render usa `DATABASE_URL` con SSL). El seed `database/init/02-insert-data.sql` solo afecta al PostgreSQL local de Docker: modificarlo **no** actualiza Neon.
+- **SQL idempotente:** `database/insert-productos-neon.sql` usa `INSERT ... ON CONFLICT (codigo_barras) DO UPDATE`, con `SELECT` previo y posterior. No duplica, no elimina otros productos y no contiene credenciales. Códigos como texto, precios `3.50` / `1.00`, `precio_antiguo NULL`, `restringido false`.
+- **Imágenes:** Neon guarda solo la ruta pública (`img/sublimecapuccino.png`, `img/galleta-soda-san-jorge.png`). La segunda se renombró desde `Galleta Soda San jorge.png` por la sensibilidad a mayúsculas de Vercel; contenido idéntico (mismo SHA256). Convención sin barra inicial, igual que el resto del catálogo.
+- **Fallback:** `PRODUCTOS_LOCALES` conserva su papel de respaldo y ahora incluye ambos productos con la estructura existente (`code` como string, `price` numérico, `image`, `restricted:false`). No se agregaron a `index.html` ni se convirtieron en fuente principal.
+- **Verificación:** `node --check frontend/app.js` OK; suma local `3.50 + 1.00 = 4.50`. Antes del push, Render respondió 200 en `/api/health` y `/api/products` (14 productos, aún sin los nuevos) y 404 en los dos códigos nuevos; después del push, Render agotó el timeout (sin conclusión). Vercel daba 404 en las dos imágenes nuevas antes del push y **200 después de él**. Pendiente: ejecutar el SQL en Neon, repetir los endpoints de Render y completar las pruebas de navegador. Detalle en `MEJORAS-IMPLEMENTADAS (1).md` §71.
+
 ## 5. Modelo de datos (cliente)
 
 ```js
@@ -395,6 +406,14 @@ python3 -m http.server 8000
 11. Alerta catálogo: con `lactosa`, Leche + Agregar → modal de coincidencia (Agregar igual / No agregar); Inca Kola → aviso suave de no verificada; badge “⚠️ Contiene lactosa” en la tarjeta.
 
 ## Historial de cambios técnicos
+
+### Dos productos nuevos en el catálogo online (2026-11-21)
+> Los cambios de código fueron confirmados y subidos por el usuario en `dd3568a` (`origin/main`); esta documentación quedó sin commitear. Sin evidencia de ejecución del SQL en Neon. Vercel desplegó automáticamente tras el push (imágenes 200); Render no respondió en la última consulta.
+
+- `frontend/app.js`: 2 entradas en `PRODUCTOS_LOCALES` (ids 15 y 16), códigos como string, precios numéricos y `restricted:false`.
+- `frontend/img/`: `sublimecapuccino.png` conservado; `Galleta Soda San jorge.png` → `galleta-soda-san-jorge.png` (mismo contenido, SHA256 verificado).
+- `database/insert-productos-neon.sql`: nuevo script idempotente con `ON CONFLICT`, separado del seed local de Docker.
+- Sin cambios en rutas, controladores, modelos, `index.html`, `styles.css` ni `sw.js`. Detalle completo en §4.11 de este documento y en `MEJORAS-IMPLEMENTADAS (1).md` §71.
 
 ### Backend dual (local/Neon) y conexión Vercel → Render (2026-10-20; documentado 2026-10-22)
 > Registro de dos commits que no figuraban en esta documentación. No se modificó código al documentarlos.

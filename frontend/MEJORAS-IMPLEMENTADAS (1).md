@@ -1565,3 +1565,57 @@ Los valores se redondean a 0,1 ms con `scanPerfRound()`; los hitos no alcanzados
 Es instrumentación **temporal**. Debe retirarse solo después de terminar todas las pruebas (Fase 6D), eliminando las siete funciones, sus llamadas y el bloque de comentarios, sin alterar el comportamiento del lector. Hasta entonces **no debe modificarse ni eliminarse**.
 
 **Verificación:** `node --check frontend/app.js` OK; `git diff --check` sin errores. No se ejecutaron lecturas reales ni se enviaron datos a ningún servicio.
+
+---
+
+## 71. 🆕 Dos productos nuevos en el catálogo online (2026-11-21)
+
+**Estado:** los cambios de código (`frontend/app.js`, imagen renombrada y script SQL) fueron **confirmados y subidos por el usuario** en el commit `dd3568a` (`feat: agregar Sublime Capuccino y Galleta San Jorge`), presente en `origin/main`. Esta documentación se añade después y **no está commiteada**. No hay evidencia de que el SQL se haya ejecutado en Neon. Vercel ya sirve las dos imágenes (HTTP 200) tras el push; Render no respondió en la última comprobación (timeout), por lo que no se puede afirmar su estado actual. `V3.0/` no fue modificado ni usado como fuente.
+
+**Objetivo:** agregar `Sublime Capuccino` (EAN `8445292635882`, S/ 3.50) y `Galleta san jorge` (EAN `7750106003094`, S/ 1.00), ambos no restringidos, a la versión online (Vercel → Render → Neon) sin cambiar la arquitectura.
+
+### 71.1 Análisis previo (sin cambios de rutas, controladores ni modelos)
+
+| Punto | Resultado verificado |
+|---|---|
+| Ruta | `GET /api/products` se monta en `backend/src/app.js:77`; alias `/api/productos`. Individual: `/api/products/:codigoBarras`. |
+| Controlador / modelo | `productoController.listar` y `buscarPorCodigoBarras` → `productoModel.listar` / `buscarPorCodigo`. |
+| Consulta | `SELECT codigo_barras, nombre, precio, precio_antiguo, imagen, restringido FROM producto ORDER BY nombre`; individual `... WHERE codigo_barras = $1`. |
+| Tabla / columnas | `producto`: `codigo_barras TEXT PK`, `nombre TEXT`, `precio NUMERIC(10,2)`, `precio_antiguo NUMERIC(10,2) NULL`, `imagen TEXT`, `restringido BOOLEAN`. |
+| Respuesta API | El modelo entrega `codigoBarras` (camelCase), `precio` como número, `imagen` tal cual y `restringido` booleano. |
+| Imágenes | El frontend hace *passthrough* (`image: item.imagen`, `<img src="${p.image}">`); convención real `img/archivo.png` **sin barra inicial**. |
+| Fallback | `PRODUCTOS_LOCALES` sigue activo si falla la API, en demo y en checkout. |
+| Render → Neon | `DATABASE_URL` con `ssl: { rejectUnauthorized: false }` (`backend/config/db.js`). |
+| Script Neon | No existía; solo el seed local `database/init/02-insert-data.sql`, que **no afecta a Neon**. |
+
+### 71.2 Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `frontend/app.js` | 2 entradas nuevas en `PRODUCTOS_LOCALES` (ids 15 y 16), con la estructura existente: `code` como **string**, `price` numérico, `image` `img/...`, `restricted: false`. |
+| `frontend/img/Galleta Soda San jorge.png` | Renombrado a `frontend/img/galleta-soda-san-jorge.png` (compatible con Vercel, sensible a mayúsculas). SHA256 idéntico antes/después (`0E8BD3C6…03A2E3`): contenido intacto. No había referencias al nombre antiguo. |
+| `database/insert-productos-neon.sql` | Nuevo. Idempotente, con `SELECT` previo, `INSERT ... ON CONFLICT (codigo_barras) DO UPDATE` y `SELECT` de verificación. |
+
+`frontend/img/sublimecapuccino.png` ya existía y conserva ese nombre. Ambas imágenes son detectadas por Git y **no están excluidas** por `.gitignore` (aparecen como *untracked*; no se hizo `git add`). No se agregaron los productos a `index.html` ni al seed local.
+
+### 71.3 SQL para Neon
+
+- Inserta si no existen y actualiza si ya existen; **no duplica, no elimina ni modifica otros productos**. No contiene `DROP`, `TRUNCATE`, `DELETE` ni credenciales.
+- Códigos como texto (`'8445292635882'`, `'7750106003094'`); precios `3.50` y `1.00`; `precio_antiguo = NULL` (permitido por el esquema); `restringido = false`.
+- Guarda solo la ruta pública `img/sublimecapuccino.png` e `img/galleta-soda-san-jorge.png`; las imágenes **no** se almacenan en Neon ni en Render.
+- Ejecución pendiente en el **SQL Editor de Neon**; el backend no ejecuta scripts al arrancar.
+
+### 71.4 Verificación realizada
+
+- `node --check frontend/app.js` → OK. Datos del fallback: 16 productos, códigos de 13 dígitos como *string*, precios numéricos, `3.50 + 1.00 = 4.50`.
+- Render (consultas HTTP reales, solo lectura, **anteriores al commit/push**): `/api/health` → 200 (un primer intento devolvió 503 por arranque en frío); `/api/products` → 200, `success:true`, **14 productos**, todavía sin los nuevos; `/api/products/8445292635882` y `/api/products/7750106003094` → 404, mientras que un código existente (`7750123450013`) → 200. **Tras el push**, nuevas consultas a `/api/health` y a los dos endpoints individuales agotaron el tiempo de espera: no hay conclusión sobre el estado actual de Render.
+- Vercel: raíz, `app.js` e `/img/Bimbo.png` → 200. Antes del push las dos imágenes nuevas daban 404; **después del push a `origin/main` ambas devuelven 200**, evidencia de que el despliegue de Vercel ocurrió automáticamente (no fue ejecutado por OpenCode).
+- No se consultó `DATABASE_URL` ni se mostraron secretos. Tras el commit `dd3568a`, `git status` refleja los dos archivos Markdown modificados por esta documentación y un `.xlsx` no versionado en `frontend/img/`, ajeno a este cambio y no modificado.
+
+### 71.5 Pendiente
+
+1. Ejecutar `database/insert-productos-neon.sql` en el SQL Editor de Neon y comprobar que el `SELECT` final devuelve las 2 filas (no hay evidencia de que ya se haya ejecutado).
+2. **Verificado:** Vercel sirve `img/sublimecapuccino.png` e `img/galleta-soda-san-jorge.png` con HTTP 200. Falta la comprobación visual en navegador (catálogo y pestaña Network sin 404).
+3. Repetir `GET /api/products` y los dos endpoints individuales en Render cuando responda (último intento: timeout); el resultado esperado tras Neon es 16 productos y HTTP 200 en ambos códigos.
+4. Probar en navegador catálogo, precios, imágenes, carrito (S/ 3.50 + S/ 1.00 = S/ 4.50) y lector de códigos, revisando consola y Network.
+5. Solo si un cliente PWA sirve `app.js` viejo: subir el caché de `frontend/sw.js` de `tottus-scan-go-v12` a `v13` con el mecanismo existente (no se hizo, porque no se observó el problema).

@@ -9,7 +9,7 @@
 BEGIN;
 
 -- ============================================================
--- Catalogo inicial: 14 productos desde ../frontend/app.js
+-- Catalogo inicial: 16 productos desde ../frontend/app.js
 -- Fuente de verdad: PRODUCTS (code, name, price, oldPrice, image, restricted).
 -- Carga repetible: ON CONFLICT actualiza sin duplicar ni borrar.
 -- ============================================================
@@ -27,7 +27,9 @@ INSERT INTO producto (codigo_barras, nombre, precio, precio_antiguo, imagen, res
   ('7750123450112', 'Café Instantáneo 200g', 19.90, 23.90, 'img/Nescafé.png', FALSE),
   ('7750123450129', 'Papel Higiénico 24 rollos', 27.50, NULL, 'img/Suave.png', FALSE),
   ('7750123450136', 'Cerveza Cristal Six Pack 355ml', 24.90, 29.90, 'img/CRISTAL-SIX-PACK-LATA.png', TRUE),
-  ('7750123450143', 'Vino Tinto Borgoña 750ml', 32.50, NULL, 'img/Tabernero.png', TRUE)
+  ('7750123450143', 'Vino Tinto Borgoña 750ml', 32.50, NULL, 'img/Tabernero.png', TRUE),
+  ('8445292635882', 'Sublime Capuccino', 3.50, NULL, 'img/sublimecapuccino.png', FALSE),
+  ('7750106003094', 'Galleta san jorge', 1.00, NULL, 'img/galleta-soda-san-jorge.png', FALSE)
 ON CONFLICT (codigo_barras) DO UPDATE SET
   nombre = EXCLUDED.nombre,
   precio = EXCLUDED.precio,
